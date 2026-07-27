@@ -58,8 +58,12 @@ them from your AnnData object.
 Install Cellucid in the Python environment used by your notebook:
 
 ```bash
-python -m pip install cellucid
+python -m pip install "cellucid @ https://github.com/theislab/cellucid-python/archive/a60eeb4432a7822685fd20bc55da04685e53d5ed.zip"
 ```
+
+This immutable revision is the verified Cellucid 0.9.1 source, including the
+current weighted-connectivity writer. The archive pin keeps this tutorial
+reproducible and does not require Git.
 
 The example below starts from an H5AD file produced by a typical Scanpy
 workflow. It assumes the file contains:
