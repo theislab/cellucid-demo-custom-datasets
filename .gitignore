@@ -1,0 +1,8 @@
+.DS_Store
+.venv/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+/.exports-backup-*/
+/.exports-stage-*/
+/.cellucid-rebuild-*/

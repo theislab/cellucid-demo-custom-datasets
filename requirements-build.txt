@@ -1,0 +1,5 @@
+cellucid @ git+https://github.com/theislab/cellucid-python.git@a60eeb4432a7822685fd20bc55da04685e53d5ed
+numpy==2.5.1
+pandas==2.3.3
+ruff==0.16.0
+scipy==1.18.0
