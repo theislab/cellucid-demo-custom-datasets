@@ -1,15 +1,16 @@
 # Publish your own Cellucid datasets on GitHub
 
-This is a deliberately small example repository. Its public data surface
-contains only:
+This is a deliberately artifact-only example repository. Its committed
+top-level contents are exactly:
 
-- this guide; and
-- an `exports/` folder with three tiny datasets that Cellucid can open.
+- `README.md` — this guide;
+- `generate_datasets.py` — the single, self-contained reproducibility file; and
+- `exports/` — three tiny, browser-ready datasets that Cellucid can open.
 
-This repository also has a small, dependency-free validator, adversarial
-tests, and cross-platform maintenance CI that protect the checked-in examples.
-Those maintenance files are not needed by Cellucid and do not need to be
-copied. Your own repository can still be just as simple as the two items above.
+Nothing else belongs in this repository: there are no tests, validation
+harness, package scaffolding, extra scripts, workflows, `.github/` directory,
+requirements file, or site assets. `generate_datasets.py` is the sole
+maintenance script and regenerates the complete checked-in `exports/` tree.
 
 ## Try this repository
 
@@ -34,6 +35,20 @@ You can also open them directly:
 
 These are teaching datasets, not biological results. They contain no patient,
 donor, or clinical information.
+
+## Cellucid documentation
+
+The Cellucid documentation uses this repository as its public reference
+catalog:
+
+- [Publish a Custom Dataset Repository](https://cellucid.readthedocs.io/en/latest/user_guide/web_app/b_data_loading/11_custom_dataset_repository.html)
+  is the complete repository contract and publishing workflow.
+- [Host Exports for Sharing from R](https://cellucid.readthedocs.io/en/latest/user_guide/r_package/d_viewing_loading/02_host_exports_for_sharing.html)
+  uses this catalog as the known-good GitHub example.
+- [Troubleshoot Data Loading](https://cellucid.readthedocs.io/en/latest/user_guide/web_app/b_data_loading/08_troubleshooting_data_loading.html)
+  uses it as the known-good connection when diagnosing GitHub paths.
+- The [Cellucid documentation index](https://cellucid.readthedocs.io/en/latest/)
+  links this repository as the minimal public-catalog model.
 
 ## What your repository needs
 
@@ -61,7 +76,7 @@ them from your AnnData object.
 Install Cellucid in the Python environment used by your notebook:
 
 ```bash
-python -m pip install "cellucid @ https://github.com/theislab/cellucid-python/archive/eedd3fca1dbb0f57a3ec9468c4a460003bda570a.zip"
+python -m pip install "cellucid @ https://github.com/theislab/cellucid-python/archive/ce5fb6dab9afc6f2d4580da063773ffe3e641bc7.zip"
 ```
 
 This immutable revision is the verified Cellucid 0.9.1 source, including the
@@ -235,20 +250,43 @@ https://www.cellucid.com/?exportsBaseUrl=https%3A%2F%2FOWNER.github.io%2FREPOSIT
 
 Replace `OWNER`, `REPOSITORY`, and `my-dataset` with your values.
 
-## Validate this example repository
+## Regenerate these example datasets
 
-The maintenance workflow runs on Linux with Python 3.11 and 3.14, and on
-macOS and Windows with Python 3.14. It verifies the catalog, identities,
-manifest-declared artifacts, bounded gzip payloads, semantic binary contents,
-and an exact checksum inventory without downloading data or installing Python
-packages.
+[`generate_datasets.py`](generate_datasets.py) contains the complete synthetic
+source data, exact dependency pins, generation logic, and safe replacement
+workflow. It is the only Python file in this repository. With
+[uv](https://docs.astral.sh/uv/), its inline dependency metadata makes the
+checked-in exports reproducible without a requirements file.
 
-To run the same checks locally with Python 3.11 or newer:
+Rebuild into a temporary directory and compare every generated path and byte
+with `exports/`, without changing the repository:
 
 ```bash
-python scripts/validate_exports.py
-python -m unittest discover -s tests -p "test_*.py" -v
+uv run generate_datasets.py --check
 ```
+
+To intentionally renew the complete export generation after editing the
+synthetic inputs, use:
+
+```bash
+uv run generate_datasets.py --force
+uv run generate_datasets.py --check
+```
+
+If the exact dependencies embedded at the top of the file are already
+installed from their recorded sources, the equivalent commands are
+`python generate_datasets.py --force` and
+`python generate_datasets.py --check`.
+
+The script checks dependency versions and the exact Cellucid source revision
+before touching `exports/`. It stages and verifies a complete generation before
+replacing the old directory, and restores the old directory when an ordinary
+Python error interrupts that swap. Portable directory replacement is not one
+filesystem-atomic operation: do not run a local viewer concurrently, and if
+the process or machine is forcibly terminated during the swap, restore the
+sole `.exports-backup-*` directory before retrying. There is intentionally no
+CI or separate test/validation framework in this artifact-only repository;
+inspect the renewed folders in Cellucid before publishing them.
 
 ## Add more datasets
 
