@@ -1,12 +1,15 @@
 # Publish your own Cellucid datasets on GitHub
 
-This is a deliberately small example repository. It contains only:
+This is a deliberately small example repository. Its public data surface
+contains only:
 
 - this guide; and
 - an `exports/` folder with three tiny datasets that Cellucid can open.
 
-There are no scripts, tests, workflows, or website files to copy. Your own
-repository can be just as simple.
+This repository also has a small, dependency-free validator, adversarial
+tests, and cross-platform maintenance CI that protect the checked-in examples.
+Those maintenance files are not needed by Cellucid and do not need to be
+copied. Your own repository can still be just as simple as the two items above.
 
 ## Try this repository
 
@@ -58,7 +61,7 @@ them from your AnnData object.
 Install Cellucid in the Python environment used by your notebook:
 
 ```bash
-python -m pip install "cellucid @ https://github.com/theislab/cellucid-python/archive/a60eeb4432a7822685fd20bc55da04685e53d5ed.zip"
+python -m pip install "cellucid @ https://github.com/theislab/cellucid-python/archive/eedd3fca1dbb0f57a3ec9468c4a460003bda570a.zip"
 ```
 
 This immutable revision is the verified Cellucid 0.9.1 source, including the
@@ -231,6 +234,21 @@ https://www.cellucid.com/?exportsBaseUrl=https%3A%2F%2FOWNER.github.io%2FREPOSIT
 ```
 
 Replace `OWNER`, `REPOSITORY`, and `my-dataset` with your values.
+
+## Validate this example repository
+
+The maintenance workflow runs on Linux with Python 3.11 and 3.14, and on
+macOS and Windows with Python 3.14. It verifies the catalog, identities,
+manifest-declared artifacts, bounded gzip payloads, semantic binary contents,
+and an exact checksum inventory without downloading data or installing Python
+packages.
+
+To run the same checks locally with Python 3.11 or newer:
+
+```bash
+python scripts/validate_exports.py
+python -m unittest discover -s tests -p "test_*.py" -v
+```
 
 ## Add more datasets
 
