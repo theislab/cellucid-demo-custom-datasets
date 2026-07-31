@@ -1,0 +1,5 @@
+# Python bytecode / cache (created when running generate_datasets.py locally)
+__pycache__/
+*.py[cod]
+
+.DS_Store

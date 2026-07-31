@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11,<3.15"
 # dependencies = [
-#   "cellucid @ https://github.com/theislab/cellucid-python/archive/ce5fb6dab9afc6f2d4580da063773ffe3e641bc7.zip",
+#   "cellucid==0.9.1",
 #   "numpy==2.5.1",
 #   "pandas==2.3.3",
 #   "scipy==1.18.0",
@@ -38,12 +38,15 @@ DEFAULT_EXPORTS = REPOSITORY_ROOT / "exports"
 CREATED_AT = "2026-07-27T00:00:00Z"
 SOURCE_NAME = "Cellucid deterministic synthetic examples"
 SOURCE_URL = "https://github.com/theislab/cellucid-demo-custom-datasets"
-CELLUCID_COMMIT = "ce5fb6dab9afc6f2d4580da063773ffe3e641bc7"
-CELLUCID_ARCHIVE_URL = (
-    f"https://github.com/theislab/cellucid-python/archive/{CELLUCID_COMMIT}.zip"
-)
+# The released Cellucid these exports were built with. Keep in step with the
+# inline dependency block above and with the install command in README.md.
+CELLUCID_RELEASE = "0.9.1"
+# The paths within cellucid-python that determine what `prepare` writes. Only
+# consulted for a maintainer's editable checkout; a released install has no
+# working tree to be dirty.
+PACKAGED_SOURCE_PATHS = ("src/cellucid", "pyproject.toml")
 EXPECTED_VERSIONS = {
-    "cellucid": "0.9.1",
+    "cellucid": CELLUCID_RELEASE,
     "numpy": "2.5.1",
     "pandas": "2.3.3",
     "scipy": "1.18.0",
@@ -71,33 +74,36 @@ DEFAULT_DATASET = "synthetic-cell-types-2d"
 def _require_cellucid_provenance(
     distribution: importlib.metadata.Distribution,
 ) -> None:
+    """Require Cellucid to be the released distribution, or a clean checkout of it.
+
+    The published recipe installs `cellucid` from PyPI at the exact version in
+    EXPECTED_VERSIONS, which the caller has already checked. A release installed
+    from an index records no ``direct_url.json``, so its absence is the expected
+    case and is accepted.
+
+    A maintainer working inside a clone of cellucid-python installs the package
+    editable instead. That is accepted too, but only while the packaged sources
+    are clean: uncommitted edits there change what `prepare` writes, and the
+    exports would no longer match the released version this file names.
+    """
+    direct_url_text = distribution.read_text("direct_url.json")
+    if direct_url_text is None:
+        # Installed from an index. This is the published path.
+        _require_distribution_import_ownership(distribution)
+        return
+
     try:
-        direct_url = json.loads(distribution.read_text("direct_url.json") or "")
-    except (TypeError, json.JSONDecodeError) as error:
+        direct_url = json.loads(direct_url_text)
+    except json.JSONDecodeError as error:
         raise RuntimeError(
-            "Cellucid installation provenance is unavailable; "
-            "run this file with `uv run generate_datasets.py ...`."
+            "The Cellucid installation records unreadable provenance; reinstall "
+            f'it with `python -m pip install "cellucid=={CELLUCID_RELEASE}"`.'
         ) from error
-
-    url = direct_url.get("url") if isinstance(direct_url, dict) else None
-    if url == CELLUCID_ARCHIVE_URL:
-        _require_distribution_import_ownership(distribution)
-        return
-
-    vcs_info = direct_url.get("vcs_info") if isinstance(direct_url, dict) else None
-    if (
-        isinstance(url, str)
-        and "github.com/theislab/cellucid-python" in url
-        and isinstance(vcs_info, dict)
-        and vcs_info.get("vcs") == "git"
-        and vcs_info.get("commit_id") == CELLUCID_COMMIT
-    ):
-        _require_distribution_import_ownership(distribution)
-        return
 
     directory_info = (
         direct_url.get("dir_info") if isinstance(direct_url, dict) else None
     )
+    url = direct_url.get("url") if isinstance(direct_url, dict) else None
     parsed_url = urllib.parse.urlparse(url) if isinstance(url, str) else None
     if (
         not isinstance(directory_info, dict)
@@ -106,8 +112,9 @@ def _require_cellucid_provenance(
         or parsed_url.scheme != "file"
     ):
         raise RuntimeError(
-            f"Cellucid must come from pinned commit {CELLUCID_COMMIT}; "
-            "run this file with `uv run generate_datasets.py ...`."
+            "Cellucid must be the released distribution, installed with "
+            f'`python -m pip install "cellucid=={CELLUCID_RELEASE}"`, or an '
+            "editable checkout of it."
         )
 
     source_root = Path(
@@ -122,23 +129,16 @@ def _require_cellucid_provenance(
         ) from error
 
     try:
-        head = subprocess.run(
-            ["git", "-C", str(source_root), "rev-parse", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        source_status = subprocess.run(
+        modified_sources = subprocess.run(
             [
                 "git",
                 "-C",
                 str(source_root),
                 "status",
-                "--porcelain=v1",
+                "--porcelain",
                 "--untracked-files=all",
                 "--",
-                "src/cellucid",
-                "pyproject.toml",
+                *PACKAGED_SOURCE_PATHS,
             ],
             check=True,
             capture_output=True,
@@ -148,10 +148,14 @@ def _require_cellucid_provenance(
         raise RuntimeError(
             "Cannot verify the editable Cellucid source checkout."
         ) from error
-    if head != CELLUCID_COMMIT or source_status:
+    if modified_sources:
+        differing = ", ".join(
+            sorted({line[3:] for line in modified_sources.splitlines() if line[3:]})
+        )
         raise RuntimeError(
-            "Editable Cellucid must be an unchanged checkout of pinned commit "
-            f"{CELLUCID_COMMIT}."
+            "The editable Cellucid packaged sources have uncommitted changes: "
+            f"{differing}. Commit or restore them, or install the released "
+            f"cellucid=={CELLUCID_RELEASE}, before generating."
         )
 
 

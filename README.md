@@ -76,12 +76,12 @@ them from your AnnData object.
 Install Cellucid in the Python environment used by your notebook:
 
 ```bash
-python -m pip install "cellucid @ https://github.com/theislab/cellucid-python/archive/ce5fb6dab9afc6f2d4580da063773ffe3e641bc7.zip"
+python -m pip install "cellucid==0.9.1"
 ```
 
-This immutable revision is the verified Cellucid 0.9.1 source, including the
-current weighted-connectivity writer. The archive pin keeps this tutorial
-reproducible and does not require Git.
+Cellucid is installed from PyPI. The version is pinned so this tutorial stays
+reproducible: `0.9.1` is the release these example exports were built with, and
+it includes the current weighted-connectivity writer.
 
 The example below starts from an H5AD file produced by a typical Scanpy
 workflow. It assumes the file contains:
@@ -278,8 +278,8 @@ installed from their recorded sources, the equivalent commands are
 `python generate_datasets.py --force` and
 `python generate_datasets.py --check`.
 
-The script checks dependency versions and the exact Cellucid source revision
-before touching `exports/`. It stages and verifies a complete generation before
+The script checks dependency versions, and that the Cellucid packaged sources
+match the pinned commit, before touching `exports/`. It stages and verifies a complete generation before
 replacing the old directory, and restores the old directory when an ordinary
 Python error interrupts that swap. Portable directory replacement is not one
 filesystem-atomic operation: do not run a local viewer concurrently, and if
