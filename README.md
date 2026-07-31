@@ -110,6 +110,7 @@ prepare(
     obs=adata.obs,
     var=adata.var,
     gene_expression=adata.X,
+    var_gene_id_column="gene_symbols",
     connectivities=adata.obsp["connectivities"],
     X_umap_2d=adata.obsm["X_umap"],
     out_dir=exports_dir / dataset_id,
@@ -140,12 +141,38 @@ exports/
 The `dataset_id` is the stable name used in links. Use lowercase letters,
 numbers, and hyphens, and do not change it after sharing the dataset.
 
+### Gene names your readers can search
+
+An export records **one name per gene** — the string a reader sees in the field
+selector, reads off a legend, and types into the gene search box. There is no
+second identifier beside it, so that name is the only way to reach a gene, and
+searching for anything else matches nothing.
+
+`var_gene_id_column=` is the one selector that decides which `var` column the
+name comes from. It defaults to `var.index`. Point it at whichever column holds
+the symbols your readers already type (`"gene_symbols"` above): in an
+accession-indexed dataset left on the default, a reader searching `CD8A` finds
+nothing at all.
+
+Cellucid performs no symbol lookup and ships no mapping of any kind. If your
+source is indexed by accession and you want symbols, resolve them yourself —
+before calling `prepare()` — and pass the resulting column.
+
+Names must be non-empty, distinct within a dataset, and free of surrounding
+whitespace, because they are printed and typed. They are never filenames: every
+payload file in an export is named by an integer index (`var/0.values.u8.gz`),
+and the manifest beside it is what says which gene that index belongs to. A
+name therefore only has to be readable — no character in it has to please a
+filesystem.
+
 If your AnnData uses different keys, inspect them first:
 
 ```python
 print(list(adata.obsm.keys()))
 print(list(adata.obsp.keys()))
 print(list(adata.obs.columns))
+print(list(adata.var.columns))
+print(adata.var.head())
 ```
 
 Then replace the keys in the `prepare(...)` call with the exact keys in your
@@ -254,9 +281,12 @@ Replace `OWNER`, `REPOSITORY`, and `my-dataset` with your values.
 
 [`generate_datasets.py`](generate_datasets.py) contains the complete synthetic
 source data, exact dependency pins, generation logic, and safe replacement
-workflow. It is the only Python file in this repository. With
-[uv](https://docs.astral.sh/uv/), its inline dependency metadata makes the
-checked-in exports reproducible without a requirements file.
+workflow. It is the only Python file in this repository. Its `_gene_frame()`
+helper is the worked version of the section above: every synthetic gene carries
+one `SYN_…` name in a `symbol` column, `var.index` holds nothing but row
+labels, and `var_gene_id_column="symbol"` is what selects the column the genes
+are named from. With [uv](https://docs.astral.sh/uv/), its inline dependency
+metadata makes the checked-in exports reproducible without a requirements file.
 
 Rebuild into a temporary directory and compare every generated path and byte
 with `exports/`, without changing the repository:

@@ -16,6 +16,7 @@ import argparse
 import importlib.metadata
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -222,6 +223,41 @@ def _graph(
     return sparse.csr_matrix(matrix)
 
 
+def _gene_frame(symbols: list[str]) -> pd.DataFrame:
+    """Build one ``var`` frame carrying the single identity an export records.
+
+    A Cellucid export stores exactly **one name per gene**: the string a reader
+    sees in the field selector, reads off a legend, and types into the gene
+    search box. There is no second identifier beside it -- no retained
+    accession, no parallel array -- so the name you choose here is the only
+    name the dataset has, and searching for anything else matches nothing.
+
+    ``var_gene_id_column`` is the one selector that decides which column that
+    name is read from. This frame keeps the symbols in ``symbol`` and passes
+    ``var_gene_id_column="symbol"``, which is the choice worth copying: name
+    your genes with the vocabulary your readers already type. An accession is a
+    poor name for the same reason -- nobody searches for one.
+
+    The name is never a filename. Payload files are named by the gene's integer
+    index (``var/0.values.u8.gz``), so a name only has to be readable and
+    distinct within the dataset; it does not have to survive a filesystem.
+
+    ``prepare()`` never invents a name. It performs no symbol lookup and ships
+    no mapping of any kind, so resolving accessions to symbols -- if that is
+    what your source needs -- belongs here, in the repository that owns the
+    data, before ``prepare()`` is called.
+    """
+    if len(set(symbols)) != len(symbols):
+        raise ValueError("Every gene needs one distinct name.")
+    return pd.DataFrame(
+        {"symbol": list(symbols)},
+        index=pd.Index(
+            [f"row-{position}" for position in range(len(symbols))],
+            name="row_label",
+        ),
+    )
+
+
 def _common_prepare(
     *,
     out_dir: Path,
@@ -243,12 +279,17 @@ def _common_prepare(
         "X_umap_3d": None,
     }
     embedding_arguments[embedding_key] = embedding
-    var = pd.DataFrame(index=pd.Index(genes, name="gene_id"))
+    var = _gene_frame(genes)
     prepare(
         latent_space=latent_space,
         obs=obs,
         var=var,
         gene_expression=expression,
+        # The one decision this example exists to show: which `var` column the
+        # genes are named from. `symbol` holds the names a reader will type, so
+        # that is the column selected -- not var.index, which here holds nothing
+        # but row labels.
+        var_gene_id_column="symbol",
         connectivities=connectivities,
         out_dir=out_dir,
         obs_keys=list(obs.columns),
@@ -308,11 +349,12 @@ def _build_trajectory_1d(out_dir: Path) -> None:
             np.float32(0.5) + np.float32(3) * pseudotime * pseudotime,
         ]
     ).astype(np.float32)
+    # One name per gene, in matrix-column order -- see _gene_frame().
     genes = [
         "SYN_EARLY",
         "SYN_TRANSITION",
         "SYN_MATURE",
-        "SYN_CYCLE",
+        "SYN_SAWTOOTH",
         "SYN_ACTIVITY",
         "SYN_LATE",
     ]
@@ -411,6 +453,7 @@ def _build_cell_types_2d(out_dir: Path) -> None:
             np.float32(0.5) + embedding[:, 1] * embedding[:, 1],
         ]
     ).astype(np.float32)
+    # One name per gene, in matrix-column order -- see _gene_frame().
     genes = [
         "SYN_MARKER_A",
         "SYN_MARKER_B",
@@ -512,6 +555,7 @@ def _build_development_3d(out_dir: Path) -> None:
             np.float32(1) + (local_index % 7) / np.float32(3),
         ]
     ).astype(np.float32)
+    # One name per gene, in matrix-column order -- see _gene_frame().
     genes = [
         "SYN_PROGENITOR",
         "SYN_COMMITMENT",
@@ -522,7 +566,7 @@ def _build_development_3d(out_dir: Path) -> None:
         "SYN_CURVATURE_X",
         "SYN_BRANCH_Y",
         "SYN_BRANCH_Z",
-        "SYN_PULSE",
+        "SYN_LOCAL_PHASE",
     ]
 
     edges: list[tuple[int, int, float]] = []
@@ -579,6 +623,115 @@ def _remove_export_locks(exports_root: Path) -> None:
             lock_path.unlink()
         except FileNotFoundError:
             pass
+
+
+def _check_indexed_payloads(dataset_root: Path, n_genes: int) -> None:
+    """Verify the identity model the generated files are supposed to demonstrate.
+
+    Every payload file in an export is named by an integer index and by nothing
+    else, and the manifest beside it is the only thing that says what that index
+    means. Each directory owns one index space running ``0 .. N-1``, and for
+    ``obs/`` that space is shared across the continuous and categorical field
+    arrays because both write into the same directory.
+    """
+    var_manifest = _load_json_object(dataset_root / "var_manifest.json")
+    pattern = var_manifest["_varSchema"]["pathPattern"]
+    if pattern != "var/{index}.values.u8.gz":
+        raise RuntimeError(f"Genes are not reached by index in {dataset_root}: {pattern}")
+    names: set[str] = set()
+    for position, entry in enumerate(var_manifest["fields"]):
+        if len(entry) != 4 or entry[0] != position:
+            raise RuntimeError(
+                f"Gene entry {position} of {dataset_root} is not "
+                "[index, name, minValue, maxValue]."
+            )
+        name = entry[1]
+        if not isinstance(name, str) or not name or name != name.strip():
+            raise RuntimeError(f"Gene {position} of {dataset_root} has no printable name.")
+        if name in names:
+            raise RuntimeError(
+                f"Gene {position} of {dataset_root} repeats the name {name!r}; a "
+                "gene has one name and it is the only way to reach it."
+            )
+        names.add(name)
+
+    obs_manifest = _load_json_object(dataset_root / "obs_manifest.json")
+    for label, schema, expected in (
+        ("continuous", obs_manifest["_obsSchemas"]["continuous"], "pathPattern"),
+        ("categorical", obs_manifest["_obsSchemas"]["categorical"], "codesPathPattern"),
+        ("categorical", obs_manifest["_obsSchemas"]["categorical"], "outlierPathPattern"),
+    ):
+        if "{index}" not in schema[expected] or "{key}" in schema[expected]:
+            raise RuntimeError(
+                f"{dataset_root} reaches its {label} obs payloads by name: "
+                f"{schema[expected]}"
+            )
+    obs_fields = obs_manifest["_continuousFields"] + obs_manifest["_categoricalFields"]
+    if sorted(entry[0] for entry in obs_fields) != list(range(len(obs_fields))):
+        raise RuntimeError(
+            f"{dataset_root} does not give its {len(obs_fields)} obs fields the "
+            "indices 0..N-1 exactly once across both field arrays; two fields "
+            "sharing one index would overwrite one another's payload."
+        )
+    obs_keys = [entry[1] for entry in obs_fields]
+    if len(set(obs_keys)) != len(obs_keys):
+        raise RuntimeError(f"{dataset_root} publishes two obs fields under one key.")
+
+    expected_payloads = {
+        "var": {f"{index}.values.u8.gz" for index in range(n_genes)},
+        "obs": set(),
+        "vectors": set(),
+    }
+    for entry in obs_manifest["_continuousFields"]:
+        expected_payloads["obs"].add(f"{entry[0]}.values.u8.gz")
+    for entry in obs_manifest["_categoricalFields"]:
+        expected_payloads["obs"].add(f"{entry[0]}.codes.u8.gz")
+        expected_payloads["obs"].add(f"{entry[0]}.outliers.u8.gz")
+    identity = _load_json_object(dataset_root / "dataset_identity.json")
+    vector_fields = (identity.get("vector_fields") or {"fields": {}})["fields"]
+    vector_indices = []
+    for label, field in vector_fields.items():
+        indices = set()
+        for dimension in field["available_dimensions"]:
+            declared = field["files"][f"{dimension}d"]
+            match = re.fullmatch(
+                r"vectors/(0|[1-9][0-9]*)_([123])d\.bin\.gz", declared
+            )
+            if match is None or int(match.group(2)) != dimension:
+                raise RuntimeError(
+                    f"{dataset_root} publishes {declared} for vector field "
+                    f"{label!r}; a vector payload is named "
+                    "vectors/<index>_<dim>d.bin.gz and by nothing else."
+                )
+            indices.add(int(match.group(1)))
+            expected_payloads["vectors"].add(declared.split("/", 1)[1])
+        if len(indices) != 1:
+            raise RuntimeError(
+                f"{dataset_root} spreads vector field {label!r} across the "
+                f"indices {sorted(indices)}; every dimension of one field is "
+                "reached by the same index."
+            )
+        vector_indices.append(indices.pop())
+    if sorted(vector_indices) != list(range(len(vector_indices))):
+        raise RuntimeError(
+            f"{dataset_root} does not give its {len(vector_indices)} vector "
+            "fields the indices 0..N-1 exactly once."
+        )
+    for directory, expected in expected_payloads.items():
+        payload_root = dataset_root / directory
+        # A dataset with no vector field publishes no vectors/ directory at all,
+        # which is the correct layout and measures as an empty set here.
+        published = (
+            {path.name for path in payload_root.iterdir()}
+            if payload_root.is_dir()
+            else set()
+        )
+        if published != expected:
+            raise RuntimeError(
+                f"{dataset_root / directory} publishes {sorted(published - expected)} "
+                f"and is missing {sorted(expected - published)}; every payload file "
+                "is named by the index its manifest declares."
+            )
 
 
 def _sanity_check_generation(exports_root: Path) -> None:
@@ -646,6 +799,8 @@ def _sanity_check_generation(exports_root: Path) -> None:
             raise RuntimeError(
                 f"Generated identity counts or id differ for {dataset_id!r}."
             )
+
+        _check_indexed_payloads(dataset_root, expected["n_genes"])
 
 
 def build_generation(exports_root: Path) -> None:
