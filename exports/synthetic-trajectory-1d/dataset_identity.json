@@ -58,14 +58,14 @@
     "fields": {
       "velocity_umap": {
         "label": "velocity_umap",
-        "basis": "umap",
         "available_dimensions": [
           1
         ],
         "default_dimension": 1,
         "files": {
           "1d": "vectors/0_1d.bin.gz"
-        }
+        },
+        "basis": "umap"
       }
     }
   }

@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11,<3.15"
 # dependencies = [
-#   "cellucid==0.9.1",
+#   "cellucid==0.9.1",  # CELLUCID_VERSION
 #   "numpy==2.5.1",
 #   "pandas==2.3.3",
 #   "scipy==1.18.0",
@@ -41,7 +41,7 @@ SOURCE_NAME = "Cellucid deterministic synthetic examples"
 SOURCE_URL = "https://github.com/theislab/cellucid-demo-custom-datasets"
 # The released Cellucid these exports were built with. Keep in step with the
 # inline dependency block above and with the install command in README.md.
-CELLUCID_RELEASE = "0.9.1"
+CELLUCID_RELEASE = "0.9.1"  # CELLUCID_VERSION
 # The paths within cellucid-python that determine what `prepare` writes. Only
 # consulted for a maintainer's editable checkout; a released install has no
 # working tree to be dirty.

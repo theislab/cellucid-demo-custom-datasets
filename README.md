@@ -4,13 +4,25 @@ This is a deliberately artifact-only example repository. Its committed
 top-level contents are exactly:
 
 - `README.md` — this guide;
-- `generate_datasets.py` — the single, self-contained reproducibility file; and
-- `exports/` — three tiny, browser-ready datasets that Cellucid can open.
+- `generate_datasets.py` — the single, self-contained reproducibility file;
+- `exports/` — three tiny, browser-ready datasets that Cellucid can open;
+- `.gitignore` and `.gitattributes` — the git metadata that keeps a checkout on
+  any platform byte-identical to the tree `--check` compares against. Thirteen
+  of the files under `exports/` are JSON, so a Windows checkout with
+  `core.autocrlf=true` would rewrite their line endings and fail that
+  comparison; `.gitattributes` pins them to LF everywhere; and
+- `LICENSE`, `CONTRIBUTING.md`, `SUPPORT.md`, `SECURITY.md` and
+  `CODE_OF_CONDUCT.md` — how *this* repository is licensed, changed, asked
+  about, and reported to. They govern this example; they are not part of the
+  shape you copy. Your own repository needs its own licence and its own
+  contact routes, not these.
 
 Nothing else belongs in this repository: there are no tests, validation
 harness, package scaffolding, extra scripts, workflows, `.github/` directory,
 requirements file, or site assets. `generate_datasets.py` is the sole
 maintenance script and regenerates the complete checked-in `exports/` tree.
+There is deliberately no `CITATION.cff`: these are synthetic teaching datasets,
+and the citable Cellucid components are the Python and R packages.
 
 ## Try this repository
 
@@ -76,11 +88,11 @@ them from your AnnData object.
 Install Cellucid in the Python environment used by your notebook:
 
 ```bash
-python -m pip install "cellucid==0.9.1"
+python -m pip install "cellucid==0.9.1"  # CELLUCID_VERSION
 ```
 
 Cellucid is installed from PyPI. The version is pinned so this tutorial stays
-reproducible: `0.9.1` is the release these example exports were built with, and
+reproducible: `0.9.1` is the release these example exports were built with, and <!-- CELLUCID_VERSION -->
 it includes the current weighted-connectivity writer.
 
 The example below starts from an H5AD file produced by a typical Scanpy
@@ -308,8 +320,16 @@ installed from their recorded sources, the equivalent commands are
 `python generate_datasets.py --force` and
 `python generate_datasets.py --check`.
 
-The script checks dependency versions, and that the Cellucid packaged sources
-match the pinned commit, before touching `exports/`. It stages and verifies a complete generation before
+Before touching `exports/`, the script refuses to run unless the environment is
+the exact one the pins name: the Python version is in range, `cellucid`,
+`numpy`, `pandas` and `scipy` are installed at exactly the pinned versions, the
+`cellucid` metadata and runtime versions agree, and the imported `cellucid` is
+the pinned distribution rather than another copy shadowing it. If `cellucid` is
+an editable checkout instead of a released install, it additionally requires
+that checkout to have no uncommitted changes under `src/cellucid` or
+`pyproject.toml` — it does not pin a commit, so a clean checkout of a different
+commit is accepted, and re-running `--check` after changing `cellucid` is what
+catches that. It stages and verifies a complete generation before
 replacing the old directory, and restores the old directory when an ordinary
 Python error interrupts that swap. Portable directory replacement is not one
 filesystem-atomic operation: do not run a local viewer concurrently, and if
