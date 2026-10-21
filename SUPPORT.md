@@ -4,10 +4,10 @@ Thanks for using the Cellucid custom-dataset example.
 
 ## Getting help
 
-- Documentation: https://cellucid.readthedocs.io
+- Documentation: https://docs.cellucid.com
 - The complete publishing workflow, including the repository contract and the
   fast-diagnosis table:
-  https://cellucid.readthedocs.io/en/latest/user_guide/web_app/b_data_loading/11_custom_dataset_repository.html
+  https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/11_custom_dataset_repository.html
 - One of the three synthetic examples here that will not open, or a step in
   `README.md` that does not work as written, is an issue here:
   https://github.com/theislab/cellucid-demo-custom-datasets/issues

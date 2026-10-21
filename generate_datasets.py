@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11,<3.15"
 # dependencies = [
-#   "cellucid==0.9.1",  # CELLUCID_VERSION
+#   "cellucid==0.9.4",  # CELLUCID_VERSION
 #   "numpy==2.5.1",
 #   "pandas==2.3.3",
 #   "scipy==1.18.0",
@@ -16,7 +16,6 @@ import argparse
 import importlib.metadata
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -30,7 +29,7 @@ from typing import Any
 import cellucid
 import numpy as np
 import pandas as pd
-from cellucid import prepare
+from cellucid import Embedding, prepare
 from cellucid.prepare_data import generate_datasets_manifest
 from scipy import sparse
 
@@ -41,7 +40,7 @@ SOURCE_NAME = "Cellucid deterministic synthetic examples"
 SOURCE_URL = "https://github.com/theislab/cellucid-demo-custom-datasets"
 # The released Cellucid these exports were built with. Keep in step with the
 # inline dependency block above and with the install command in README.md.
-CELLUCID_RELEASE = "0.9.1"  # CELLUCID_VERSION
+CELLUCID_RELEASE = "0.9.4"  # CELLUCID_VERSION
 # The paths within cellucid-python that determine what `prepare` writes. Only
 # consulted for a maintainer's editable checkout; a released install has no
 # working tree to be dirty.
@@ -57,16 +56,22 @@ EXPECTED_DATASETS = {
         "path": "synthetic-cell-types-2d/",
         "n_cells": 72,
         "n_genes": 8,
+        "embeddings": {"islands": 2, "marker_scores": 2},
+        "vector_fields": {},
     },
     "synthetic-development-3d": {
         "path": "synthetic-development-3d/",
         "n_cells": 96,
         "n_genes": 10,
+        "embeddings": {"branches": 3},
+        "vector_fields": {"velocity": ["branches"]},
     },
     "synthetic-trajectory-1d": {
         "path": "synthetic-trajectory-1d/",
         "n_cells": 48,
         "n_genes": 6,
+        "embeddings": {"trajectory": 1},
+        "vector_fields": {"velocity": ["trajectory"]},
     },
 }
 DEFAULT_DATASET = "synthetic-cell-types-2d"
@@ -223,24 +228,27 @@ def _graph(
     return sparse.csr_matrix(matrix)
 
 
-def _gene_frame(symbols: list[str]) -> pd.DataFrame:
-    """Build one ``var`` frame carrying the single identity an export records.
+def _gene_frame(symbols: list[str], *, prefix: str) -> pd.DataFrame:
+    """Build one ``var`` frame carrying the gene names an export records.
 
-    A Cellucid export stores exactly **one name per gene**: the string a reader
-    sees in the field selector, reads off a legend, and types into the gene
-    search box. There is no second identifier beside it -- no retained
-    accession, no parallel array -- so the name you choose here is the only
-    name the dataset has, and searching for anything else matches nothing.
-
-    ``var_gene_id_column`` is the one selector that decides which column that
-    name is read from. This frame keeps the symbols in ``symbol`` and passes
+    A Cellucid export names every gene in one **default** name set: the string a
+    reader sees in the field selector, reads off a legend, and types into the
+    gene search box. ``var_gene_id_column`` decides which column that set is
+    read from. This frame keeps the symbols in ``symbol`` and passes
     ``var_gene_id_column="symbol"``, which is the choice worth copying: name
-    your genes with the vocabulary your readers already type. An accession is a
-    poor name for the same reason -- nobody searches for one.
+    your genes with the vocabulary your readers already type.
 
-    The name is never a filename. Payload files are named by the gene's integer
+    An export can also carry alternative name sets, one per column listed in
+    ``var_gene_name_columns``, and the viewer's Gene names control switches
+    between them. This frame adds a synthetic accession column, ``gene_id``,
+    as that second set, the way a real dataset would offer Ensembl accessions
+    beside its symbols. A name set is metadata only: every set addresses the
+    same expression payload, so a second set adds a few bytes to
+    ``var_manifest.json`` and nothing under ``var/``.
+
+    No name is ever a filename. Payload files are named by the gene's integer
     index (``var/0.values.u8.gz``), so a name only has to be readable and
-    distinct within the dataset; it does not have to survive a filesystem.
+    distinct within its set; it does not have to survive a filesystem.
 
     ``prepare()`` never invents a name. It performs no symbol lookup and ships
     no mapping of any kind, so resolving accessions to symbols -- if that is
@@ -250,7 +258,12 @@ def _gene_frame(symbols: list[str]) -> pd.DataFrame:
     if len(set(symbols)) != len(symbols):
         raise ValueError("Every gene needs one distinct name.")
     return pd.DataFrame(
-        {"symbol": list(symbols)},
+        {
+            "symbol": list(symbols),
+            "gene_id": [
+                f"{prefix}{position + 1:06d}" for position in range(len(symbols))
+            ],
+        },
         index=pd.Index(
             [f"row-{position}" for position in range(len(symbols))],
             name="row_label",
@@ -264,32 +277,28 @@ def _common_prepare(
     dataset_id: str,
     dataset_name: str,
     description: str,
-    embedding_key: str,
-    embedding: np.ndarray,
+    embeddings: dict[str, Embedding],
+    embedding_defaults: dict[str, str] | None = None,
     latent_space: np.ndarray,
     obs: pd.DataFrame,
     genes: list[str],
+    gene_id_prefix: str,
     expression: np.ndarray,
     connectivities: sparse.csr_matrix,
-    vector_fields: dict[str, np.ndarray] | None = None,
+    vector_fields: dict[str, dict[str, np.ndarray]] | None = None,
 ) -> None:
-    embedding_arguments = {
-        "X_umap_1d": None,
-        "X_umap_2d": None,
-        "X_umap_3d": None,
-    }
-    embedding_arguments[embedding_key] = embedding
-    var = _gene_frame(genes)
+    var = _gene_frame(genes, prefix=gene_id_prefix)
     prepare(
         latent_space=latent_space,
         obs=obs,
         var=var,
         gene_expression=expression,
-        # The one decision this example exists to show: which `var` column the
-        # genes are named from. `symbol` holds the names a reader will type, so
-        # that is the column selected -- not var.index, which here holds nothing
-        # but row labels.
+        # Which `var` column names the genes by default: `symbol` holds the
+        # names a reader will type, so that is the column selected -- not
+        # var.index, which here holds nothing but row labels.
         var_gene_id_column="symbol",
+        # A second name set the viewer can switch to (see _gene_frame()).
+        var_gene_name_columns=["gene_id"],
         connectivities=connectivities,
         out_dir=out_dir,
         obs_keys=list(obs.columns),
@@ -306,8 +315,9 @@ def _common_prepare(
         dataset_description=description,
         source_name=SOURCE_NAME,
         source_url=SOURCE_URL,
+        embeddings=embeddings,
+        embedding_defaults=embedding_defaults,
         vector_fields=vector_fields,
-        **embedding_arguments,
     )
 
 
@@ -349,7 +359,7 @@ def _build_trajectory_1d(out_dir: Path) -> None:
             np.float32(0.5) + np.float32(3) * pseudotime * pseudotime,
         ]
     ).astype(np.float32)
-    # One name per gene, in matrix-column order -- see _gene_frame().
+    # The default name of each gene, in matrix-column order -- see _gene_frame().
     genes = [
         "SYN_EARLY",
         "SYN_TRANSITION",
@@ -376,14 +386,15 @@ def _build_trajectory_1d(out_dir: Path) -> None:
             "A synthetic 48-cell progression for learning planar 1D navigation, "
             "pseudotime coloring, gene trends, connectivity, and a velocity-style overlay."
         ),
-        embedding_key="X_umap_1d",
-        embedding=embedding,
+        embeddings={"trajectory": Embedding(embedding, label="Trajectory")},
         latent_space=np.column_stack([pseudotime, transcriptional_activity]),
         obs=obs,
         genes=genes,
+        gene_id_prefix="SYNT",
         expression=expression,
         connectivities=_graph(n_cells, edges),
-        vector_fields={"velocity_umap_1d": velocity},
+        # A vector field is bound to the embeddings it is drawn over.
+        vector_fields={"velocity": {"trajectory": velocity}},
     )
 
 
@@ -453,7 +464,20 @@ def _build_cell_types_2d(out_dir: Path) -> None:
             np.float32(0.5) + embedding[:, 1] * embedding[:, 1],
         ]
     ).astype(np.float32)
-    # One name per gene, in matrix-column order -- see _gene_frame().
+    # A second 2D layout of the same cells, read off the marker genes: the
+    # horizontal axis contrasts marker A with marker B, the vertical one sets
+    # marker C against both, and the shared and quality genes spread each
+    # island out. Two embeddings of one dimension need an explicit default,
+    # which `embedding_defaults` below names.
+    marker_scores = np.column_stack(
+        [
+            expression[:, 0] - expression[:, 1] + expression[:, 3] / np.float32(4),
+            expression[:, 2]
+            - (expression[:, 0] + expression[:, 1]) / np.float32(2)
+            + expression[:, 4],
+        ]
+    ).astype(np.float32)
+    # The default name of each gene, in matrix-column order -- see _gene_frame().
     genes = [
         "SYN_MARKER_A",
         "SYN_MARKER_B",
@@ -486,11 +510,15 @@ def _build_cell_types_2d(out_dir: Path) -> None:
             "Three synthetic 2D populations for learning categorical and continuous "
             "coloring, marker genes, filtering, highlighting, and weighted connectivity."
         ),
-        embedding_key="X_umap_2d",
-        embedding=embedding,
+        embeddings={
+            "islands": Embedding(embedding, label="Island layout"),
+            "marker_scores": Embedding(marker_scores, label="Marker scores"),
+        },
+        embedding_defaults={"2d": "islands"},
         latent_space=embedding,
         obs=obs,
         genes=genes,
+        gene_id_prefix="SYNC",
         expression=expression,
         connectivities=_graph(n_cells, edges),
     )
@@ -555,7 +583,7 @@ def _build_development_3d(out_dir: Path) -> None:
             np.float32(1) + (local_index % 7) / np.float32(3),
         ]
     ).astype(np.float32)
-    # One name per gene, in matrix-column order -- see _gene_frame().
+    # The default name of each gene, in matrix-column order -- see _gene_frame().
     genes = [
         "SYN_PROGENITOR",
         "SYN_COMMITMENT",
@@ -594,14 +622,14 @@ def _build_development_3d(out_dir: Path) -> None:
             "A synthetic two-lineage 3D progression for orbit navigation, temporal "
             "metadata, fate markers, graph context, and a velocity-style vector field."
         ),
-        embedding_key="X_umap_3d",
-        embedding=embedding,
+        embeddings={"branches": Embedding(embedding, label="Branch layout")},
         latent_space=embedding,
         obs=obs,
         genes=genes,
+        gene_id_prefix="SYND",
         expression=expression,
         connectivities=_graph(n_cells, edges),
-        vector_fields={"velocity_umap_3d": velocity},
+        vector_fields={"velocity": {"branches": velocity}},
     )
 
 
@@ -625,16 +653,21 @@ def _remove_export_locks(exports_root: Path) -> None:
             pass
 
 
-def _check_indexed_payloads(dataset_root: Path, n_genes: int) -> None:
+def _check_indexed_payloads(dataset_root: Path, expected: dict[str, Any]) -> None:
     """Verify the identity model the generated files are supposed to demonstrate.
 
     Every payload file in an export is named by an integer index and by nothing
     else, and the manifest beside it is the only thing that says what that index
     means. Each directory owns one index space running ``0 .. N-1``, and for
     ``obs/`` that space is shared across the continuous and categorical field
-    arrays because both write into the same directory.
+    arrays because both write into the same directory. An embedding is
+    ``embeddings/<index>_<dim>d.bin.gz`` and a vector field bound to one is
+    ``vectors/<field index>_<embedding index>.bin.gz``.
     """
+    n_genes = expected["n_genes"]
     var_manifest = _load_json_object(dataset_root / "var_manifest.json")
+    if var_manifest.get("_format") != "compact_v2":
+        raise RuntimeError(f"{dataset_root} var_manifest.json is not compact_v2.")
     pattern = var_manifest["_varSchema"]["pathPattern"]
     if pattern != "var/{index}.values.u8.gz":
         raise RuntimeError(f"Genes are not reached by index in {dataset_root}: {pattern}")
@@ -651,20 +684,39 @@ def _check_indexed_payloads(dataset_root: Path, n_genes: int) -> None:
         if name in names:
             raise RuntimeError(
                 f"Gene {position} of {dataset_root} repeats the name {name!r}; a "
-                "gene has one name and it is the only way to reach it."
+                "name set holds each name once."
             )
         names.add(name)
+    name_sets = var_manifest["gene_name_sets"]
+    if [name_set["source"] for name_set in name_sets] != ["symbol", "gene_id"]:
+        raise RuntimeError(
+            f"{dataset_root} does not name its genes from 'symbol' with the "
+            "alternative set 'gene_id'."
+        )
+    alternative = name_sets[1]["names"]
+    if (
+        name_sets[0]["names"] is not None
+        or not isinstance(alternative, list)
+        or len(alternative) != n_genes
+        or any(not isinstance(name, str) for name in alternative)
+        or len(set(alternative)) != n_genes
+    ):
+        raise RuntimeError(
+            f"{dataset_root} does not publish one distinct 'gene_id' name per gene."
+        )
 
     obs_manifest = _load_json_object(dataset_root / "obs_manifest.json")
-    for label, schema, expected in (
+    if obs_manifest.get("_format") != "compact_v2":
+        raise RuntimeError(f"{dataset_root} obs_manifest.json is not compact_v2.")
+    for label, schema, key in (
         ("continuous", obs_manifest["_obsSchemas"]["continuous"], "pathPattern"),
         ("categorical", obs_manifest["_obsSchemas"]["categorical"], "codesPathPattern"),
         ("categorical", obs_manifest["_obsSchemas"]["categorical"], "outlierPathPattern"),
     ):
-        if "{index}" not in schema[expected] or "{key}" in schema[expected]:
+        if "{index}" not in schema[key] or "{key}" in schema[key]:
             raise RuntimeError(
                 f"{dataset_root} reaches its {label} obs payloads by name: "
-                f"{schema[expected]}"
+                f"{schema[key]}"
             )
     obs_fields = obs_manifest["_continuousFields"] + obs_manifest["_categoricalFields"]
     if sorted(entry[0] for entry in obs_fields) != list(range(len(obs_fields))):
@@ -677,47 +729,54 @@ def _check_indexed_payloads(dataset_root: Path, n_genes: int) -> None:
     if len(set(obs_keys)) != len(obs_keys):
         raise RuntimeError(f"{dataset_root} publishes two obs fields under one key.")
 
-    expected_payloads = {
+    identity = _load_json_object(dataset_root / "dataset_identity.json")
+    if identity.get("version") != 3:
+        raise RuntimeError(f"{dataset_root} dataset_identity.json is not version 3.")
+    items = identity["embeddings"]["items"]
+    if {key: item["dimension"] for key, item in items.items()} != expected["embeddings"]:
+        raise RuntimeError(
+            f"{dataset_root} publishes the embeddings {sorted(items)}, not "
+            f"{sorted(expected['embeddings'])}."
+        )
+    embedding_index = {key: index for index, key in enumerate(items)}
+    expected_payloads: dict[str, set[str]] = {
+        "embeddings": set(),
         "var": {f"{index}.values.u8.gz" for index in range(n_genes)},
         "obs": set(),
         "vectors": set(),
     }
+    for key, item in items.items():
+        name = f"{embedding_index[key]}_{item['dimension']}d.bin.gz"
+        if item["file"] != f"embeddings/{name}":
+            raise RuntimeError(
+                f"{dataset_root} publishes embedding {key!r} as {item['file']}; an "
+                "embedding is named embeddings/<index>_<dim>d.bin.gz and by "
+                "nothing else."
+            )
+        expected_payloads["embeddings"].add(name)
     for entry in obs_manifest["_continuousFields"]:
         expected_payloads["obs"].add(f"{entry[0]}.values.u8.gz")
     for entry in obs_manifest["_categoricalFields"]:
         expected_payloads["obs"].add(f"{entry[0]}.codes.u8.gz")
         expected_payloads["obs"].add(f"{entry[0]}.outliers.u8.gz")
-    identity = _load_json_object(dataset_root / "dataset_identity.json")
     vector_fields = (identity.get("vector_fields") or {"fields": {}})["fields"]
-    vector_indices = []
-    for label, field in vector_fields.items():
-        indices = set()
-        for dimension in field["available_dimensions"]:
-            declared = field["files"][f"{dimension}d"]
-            match = re.fullmatch(
-                r"vectors/(0|[1-9][0-9]*)_([123])d\.bin\.gz", declared
-            )
-            if match is None or int(match.group(2)) != dimension:
+    bindings = {label: list(field["files"]) for label, field in vector_fields.items()}
+    if bindings != expected["vector_fields"]:
+        raise RuntimeError(
+            f"{dataset_root} binds its vector fields as {bindings}, not "
+            f"{expected['vector_fields']}."
+        )
+    for field_index, (label, field) in enumerate(vector_fields.items()):
+        for key, declared in field["files"].items():
+            name = f"{field_index}_{embedding_index[key]}.bin.gz"
+            if declared != f"vectors/{name}":
                 raise RuntimeError(
                     f"{dataset_root} publishes {declared} for vector field "
-                    f"{label!r}; a vector payload is named "
-                    "vectors/<index>_<dim>d.bin.gz and by nothing else."
+                    f"{label!r} over {key!r}; that payload is named "
+                    f"vectors/{name} and by nothing else."
                 )
-            indices.add(int(match.group(1)))
-            expected_payloads["vectors"].add(declared.split("/", 1)[1])
-        if len(indices) != 1:
-            raise RuntimeError(
-                f"{dataset_root} spreads vector field {label!r} across the "
-                f"indices {sorted(indices)}; every dimension of one field is "
-                "reached by the same index."
-            )
-        vector_indices.append(indices.pop())
-    if sorted(vector_indices) != list(range(len(vector_indices))):
-        raise RuntimeError(
-            f"{dataset_root} does not give its {len(vector_indices)} vector "
-            "fields the indices 0..N-1 exactly once."
-        )
-    for directory, expected in expected_payloads.items():
+            expected_payloads["vectors"].add(name)
+    for directory, names_expected in expected_payloads.items():
         payload_root = dataset_root / directory
         # A dataset with no vector field publishes no vectors/ directory at all,
         # which is the correct layout and measures as an empty set here.
@@ -726,11 +785,12 @@ def _check_indexed_payloads(dataset_root: Path, n_genes: int) -> None:
             if payload_root.is_dir()
             else set()
         )
-        if published != expected:
+        if published != names_expected:
             raise RuntimeError(
-                f"{dataset_root / directory} publishes {sorted(published - expected)} "
-                f"and is missing {sorted(expected - published)}; every payload file "
-                "is named by the index its manifest declares."
+                f"{dataset_root / directory} publishes "
+                f"{sorted(published - names_expected)} and is missing "
+                f"{sorted(names_expected - published)}; every payload file is "
+                "named by the index its manifest declares."
             )
 
 
@@ -800,7 +860,7 @@ def _sanity_check_generation(exports_root: Path) -> None:
                 f"Generated identity counts or id differ for {dataset_id!r}."
             )
 
-        _check_indexed_payloads(dataset_root, expected["n_genes"])
+        _check_indexed_payloads(dataset_root, expected)
 
 
 def build_generation(exports_root: Path) -> None:

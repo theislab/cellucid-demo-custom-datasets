@@ -22,7 +22,8 @@ harness, package scaffolding, extra scripts, workflows, `.github/` directory,
 requirements file, or site assets. `generate_datasets.py` is the sole
 maintenance script and regenerates the complete checked-in `exports/` tree.
 There is deliberately no `CITATION.cff`: these are synthetic teaching datasets,
-and the citable Cellucid components are the Python and R packages.
+not a result to cite. To cite Cellucid itself, see
+[Citing Cellucid](https://docs.cellucid.com/en/latest/citing.html).
 
 ## Try this repository
 
@@ -35,15 +36,23 @@ theislab/cellucid-demo-custom-datasets/exports
 
 Then choose one of these small synthetic examples:
 
-- `synthetic-cell-types-2d`
-- `synthetic-development-3d`
-- `synthetic-trajectory-1d`
+- `synthetic-cell-types-2d` — two 2-D embeddings of the same cells, an island
+  layout and a marker-score layout, so the embedding picker has a choice;
+- `synthetic-development-3d` — a 3-D embedding with a velocity-style vector
+  field bound to it;
+- `synthetic-trajectory-1d` — a 1-D embedding with a vector field bound to it.
+
+Every gene in all three carries two names: its `SYN_…` symbol, which is the
+default, and a synthetic accession such as `SYNC000001`, which the Gene names
+control switches to.
 
 You can also open them directly:
 
-- [2-D cell types](https://www.cellucid.com/?github=theislab/cellucid-demo-custom-datasets/exports&dataset=synthetic-cell-types-2d)
-- [3-D development](https://www.cellucid.com/?github=theislab/cellucid-demo-custom-datasets/exports&dataset=synthetic-development-3d)
-- [1-D trajectory](https://www.cellucid.com/?github=theislab/cellucid-demo-custom-datasets/exports&dataset=synthetic-trajectory-1d)
+| Dataset | Open |
+| --- | --- |
+| 2-D cell types | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?github=theislab/cellucid-demo-custom-datasets/exports&dataset=synthetic-cell-types-2d) |
+| 3-D development | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?github=theislab/cellucid-demo-custom-datasets/exports&dataset=synthetic-development-3d) |
+| 1-D trajectory | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?github=theislab/cellucid-demo-custom-datasets/exports&dataset=synthetic-trajectory-1d) |
 
 These are teaching datasets, not biological results. They contain no patient,
 donor, or clinical information.
@@ -53,13 +62,13 @@ donor, or clinical information.
 The Cellucid documentation uses this repository as its public reference
 catalog:
 
-- [Publish a Custom Dataset Repository](https://cellucid.readthedocs.io/en/latest/user_guide/web_app/b_data_loading/11_custom_dataset_repository.html)
+- [Publish a Custom Dataset Repository](https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/11_custom_dataset_repository.html)
   is the complete repository contract and publishing workflow.
-- [Host Exports for Sharing from R](https://cellucid.readthedocs.io/en/latest/user_guide/r_package/d_viewing_loading/02_host_exports_for_sharing.html)
+- [Host Exports for Sharing from R](https://docs.cellucid.com/en/latest/user_guide/r_package/d_viewing_loading/02_host_exports_for_sharing.html)
   uses this catalog as the known-good GitHub example.
-- [Troubleshoot Data Loading](https://cellucid.readthedocs.io/en/latest/user_guide/web_app/b_data_loading/08_troubleshooting_data_loading.html)
+- [Troubleshoot Data Loading](https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/08_troubleshooting_data_loading.html)
   uses it as the known-good connection when diagnosing GitHub paths.
-- The [Cellucid documentation index](https://cellucid.readthedocs.io/en/latest/)
+- The [Cellucid documentation index](https://docs.cellucid.com/en/latest/)
   links this repository as the minimal public-catalog model.
 
 ## What your repository needs
@@ -73,7 +82,7 @@ your-repository/
     ├── datasets.json
     └── my-dataset/
         ├── dataset_identity.json
-        ├── points_2d.bin.gz
+        ├── embeddings/
         ├── obs_manifest.json
         ├── obs/
         ├── var_manifest.json
@@ -88,19 +97,23 @@ them from your AnnData object.
 Install Cellucid in the Python environment used by your notebook:
 
 ```bash
-python -m pip install "cellucid==0.9.1"  # CELLUCID_VERSION
+python -m pip install "cellucid==0.9.4"  # CELLUCID_VERSION
 ```
 
 Cellucid is installed from PyPI. The version is pinned so this tutorial stays
-reproducible: `0.9.1` is the release these example exports were built with, and <!-- CELLUCID_VERSION -->
-it includes the current weighted-connectivity writer.
+reproducible: `0.9.4` is the release these example exports were built with, and <!-- CELLUCID_VERSION -->
+it writes export format 3, which carries any number of embeddings per
+dimension and alternative gene-name sets. A viewer reads exactly one format, so
+an export written by an earlier release has to be prepared again.
 
 The example below starts from an H5AD file produced by a typical Scanpy
 workflow. It assumes the file contains:
 
 - `X_pca` in `adata.obsm`;
-- a 2-D UMAP in `adata.obsm["X_umap"]`; and
-- a neighbor graph in `adata.obsp["connectivities"]`.
+- a 2-D UMAP in `adata.obsm["X_umap"]`;
+- a neighbor graph in `adata.obsp["connectivities"]`; and
+- gene symbols in `adata.var["gene_symbols"]` and accessions in
+  `adata.var["gene_ids"]`.
 
 In a Jupyter notebook, run:
 
@@ -109,7 +122,7 @@ from pathlib import Path
 
 import anndata as ad
 
-from cellucid import prepare
+from cellucid import Embedding, prepare
 from cellucid.prepare_data import generate_datasets_manifest
 
 adata = ad.read_h5ad("my_data.h5ad")
@@ -123,8 +136,15 @@ prepare(
     var=adata.var,
     gene_expression=adata.X,
     var_gene_id_column="gene_symbols",
+    var_gene_name_columns=["gene_ids"],
     connectivities=adata.obsp["connectivities"],
-    X_umap_2d=adata.obsm["X_umap"],
+    embeddings={
+        "X_umap": Embedding(adata.obsm["X_umap"], label="UMAP", source_key="X_umap"),
+        "X_pca": Embedding(
+            adata.obsm["X_pca"], columns=[0, 1], label="PCA", source_key="X_pca"
+        ),
+    },
+    embedding_defaults={"2d": "X_umap"},
     out_dir=exports_dir / dataset_id,
     dataset_id=dataset_id,
     dataset_name="My dataset",
@@ -153,29 +173,42 @@ exports/
 The `dataset_id` is the stable name used in links. Use lowercase letters,
 numbers, and hyphens, and do not change it after sharing the dataset.
 
+### Embeddings
+
+`embeddings=` maps an id of your choosing to each embedding to export. Its
+dimension is the number of columns it is read from: a two-column array is 2-D,
+and a wider array such as the 50-column `X_pca` names the columns to plot with
+`Embedding(..., columns=[0, 1])`. `label` is what the viewer's embedding picker
+shows, and `source_key` records where the array came from. Export as many
+embeddings per dimension as you like; when a dimension has more than one,
+`embedding_defaults` names the one it opens on.
+
 ### Gene names your readers can search
 
-An export records **one name per gene** — the string a reader sees in the field
-selector, reads off a legend, and types into the gene search box. There is no
-second identifier beside it, so that name is the only way to reach a gene, and
-searching for anything else matches nothing.
+An export names every gene in one **default** name set — the string a reader
+sees in the field selector, reads off a legend, and types into the gene search
+box. `var_gene_id_column=` decides which `var` column that set comes from. It
+defaults to `var.index`. Point it at whichever column holds the symbols your
+readers already type (`"gene_symbols"` above): in an accession-indexed dataset
+left on the default, a reader searching `CD8A` finds nothing at all.
 
-`var_gene_id_column=` is the one selector that decides which `var` column the
-name comes from. It defaults to `var.index`. Point it at whichever column holds
-the symbols your readers already type (`"gene_symbols"` above): in an
-accession-indexed dataset left on the default, a reader searching `CD8A` finds
-nothing at all.
+`var_gene_name_columns=` adds alternative name sets, one per column, and the
+viewer's Gene names control switches between them — `"gene_ids"` above lets a
+reader search by accession as well. A name set is metadata only: every set
+reaches the same expression values, so a second one costs a few bytes in
+`var_manifest.json`.
 
 Cellucid performs no symbol lookup and ships no mapping of any kind. If your
 source is indexed by accession and you want symbols, resolve them yourself —
 before calling `prepare()` — and pass the resulting column.
 
-Names must be non-empty, distinct within a dataset, and free of surrounding
-whitespace, because they are printed and typed. They are never filenames: every
-payload file in an export is named by an integer index (`var/0.values.u8.gz`),
-and the manifest beside it is what says which gene that index belongs to. A
-name therefore only has to be readable — no character in it has to please a
-filesystem.
+In every set, an empty value takes the row's `var.index` name and a repeated
+name is made unique (`MATR3`, `MATR3-1`), and `prepare()` prints what it
+renamed. Names must be free of surrounding whitespace, because they are printed
+and typed. They are never filenames: every payload file in an export is named
+by an integer index (`var/0.values.u8.gz`), and the manifest beside it is what
+says which gene that index belongs to. A name therefore only has to be
+readable — no character in it has to please a filesystem.
 
 If your AnnData uses different keys, inspect them first:
 
@@ -191,9 +224,9 @@ Then replace the keys in the `prepare(...)` call with the exact keys in your
 file. Do not invent a missing embedding or graph.
 
 For a dataset without a connectivity graph, omit the `connectivities=...`
-line. For 1-D or 3-D data, pass the real array as `X_umap_1d` or
-`X_umap_3d`. The
-[complete preparation guide](https://cellucid.readthedocs.io/en/latest/user_guide/python_package/c_data_preparation_api/index.html)
+line. For 1-D or 3-D data, add the real array to `embeddings=`; its column count
+is its dimension. The
+[complete preparation guide](https://docs.cellucid.com/en/latest/user_guide/python_package/c_data_preparation_api/index.html)
 explains velocity fields, multiple dimensions, metadata selection, and large
 datasets.
 
@@ -252,6 +285,14 @@ The shareable link has this form:
 https://www.cellucid.com/?github=OWNER/REPOSITORY/exports&dataset=my-dataset
 ```
 
+To give the link a one-click badge in your README, wrap it in the
+"Open in Cellucid" badge (the **Share** button beside **Dataset** in the
+Session panel writes this snippet for you):
+
+```markdown
+[![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?github=OWNER/REPOSITORY/exports&dataset=my-dataset)
+```
+
 The short repository form uses the `main` branch. If you intentionally publish
 from another branch, include it explicitly:
 
@@ -294,10 +335,15 @@ Replace `OWNER`, `REPOSITORY`, and `my-dataset` with your values.
 [`generate_datasets.py`](generate_datasets.py) contains the complete synthetic
 source data, exact dependency pins, generation logic, and safe replacement
 workflow. It is the only Python file in this repository. Its `_gene_frame()`
-helper is the worked version of the section above: every synthetic gene carries
-one `SYN_…` name in a `symbol` column, `var.index` holds nothing but row
-labels, and `var_gene_id_column="symbol"` is what selects the column the genes
-are named from. With [uv](https://docs.astral.sh/uv/), its inline dependency
+helper is the worked version of the gene-name section above: every synthetic
+gene carries one `SYN_…` name in a `symbol` column and one synthetic accession
+in a `gene_id` column, `var.index` holds nothing but row labels,
+`var_gene_id_column="symbol"` selects the default names, and
+`var_gene_name_columns=["gene_id"]` adds the accessions as a second set. The
+2-D example passes two embeddings with `embedding_defaults={"2d": "islands"}`,
+and each vector field is bound to the embedding it is drawn over, as in
+`vector_fields={"velocity": {"branches": velocity}}`. With
+[uv](https://docs.astral.sh/uv/), its inline dependency
 metadata makes the checked-in exports reproducible without a requirements file.
 
 Rebuild into a temporary directory and compare every generated path and byte
@@ -369,7 +415,7 @@ Before making the repository public:
 - ask the person responsible for the data if public release is permitted.
 
 If the data cannot be public, do not upload it to this type of repository. Use
-the [Cellucid server workflow](https://cellucid.readthedocs.io/en/latest/user_guide/web_app/b_data_loading/04_server_tutorial.html)
+the [Cellucid server workflow](https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/04_server_tutorial.html)
 on an appropriately protected system instead.
 
 ## Common problems
@@ -392,7 +438,7 @@ open the exact `/exports/datasets.json` URL.
 **A file is too large for GitHub**
 
 GitHub rejects ordinary Git files larger than 100 MiB. Use the
-[Cellucid server workflow](https://cellucid.readthedocs.io/en/latest/user_guide/web_app/b_data_loading/04_server_tutorial.html)
+[Cellucid server workflow](https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/04_server_tutorial.html)
 instead of Git LFS pointers.
 
 **The wrong dataset opens**
@@ -404,4 +450,4 @@ Include the exact dataset ID in the link:
 ```
 
 For the full data-source map, see the
-[Cellucid loading documentation](https://cellucid.readthedocs.io/en/latest/user_guide/web_app/b_data_loading/index.html).
+[Cellucid loading documentation](https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/index.html).

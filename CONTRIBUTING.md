@@ -35,7 +35,7 @@ there too, it is the export; if it is only wrong over GitHub, it is the
 connection.
 
 The publishing workflow itself is documented once, in
-[Publish a Custom Dataset Repository](https://cellucid.readthedocs.io/en/latest/user_guide/web_app/b_data_loading/11_custom_dataset_repository.html).
+[Publish a Custom Dataset Repository](https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/11_custom_dataset_repository.html).
 `README.md` here is the short path through it. A rule that changes in one has to
 change in the other, in the same pass.
 
@@ -96,8 +96,9 @@ Two consequences are yours as a contributor rather than the reader's:
   package scaffolding, no workflows, no `.github/` directory, no requirements
   file, and no site assets.
 - There is intentionally no `CITATION.cff` either. The datasets here are
-  synthetic teaching material, not a result anyone should cite; the citable
-  companions are the Python (`theislab/cellucid-python`) and R
-  (`theislab/cellucid-r`) packages, whose `CITATION.cff` files carry `version:`.
-  Adding one here would put a "Cite this repository" button on a tutorial, and
-  would name this repository's author in every copy of the example.
+  synthetic teaching material, not a result anyone should cite. Cellucid itself
+  is cited through the `preferred-citation` that every other Cellucid
+  repository's `CITATION.cff` shares (see
+  [Citing Cellucid](https://docs.cellucid.com/en/latest/citing.html));
+  adding a file here would put a "Cite this repository" button on a tutorial,
+  and would name this repository's author in every copy of the example.
