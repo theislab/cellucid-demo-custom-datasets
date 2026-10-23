@@ -1,16 +1,24 @@
 # Publish your own Cellucid datasets on GitHub
 
-This is a deliberately artifact-only example repository. Its committed
-top-level contents are exactly:
+This is a deliberately artifact-only example repository. Cellucid reads AnnData
+directly, so publishing a dataset on GitHub means committing a **Cellucid-ready
+AnnData** — an ordinary AnnData that `cellucid.prepare()` (Python) or
+`cellucid_prepare()` (R) laid out for the browser — and sharing one link. Its
+committed top-level contents are exactly:
 
 - `README.md` — this guide;
 - `generate_datasets.py` — the single, self-contained reproducibility file;
-- `exports/` — three tiny, browser-ready datasets that Cellucid can open;
+- `catalog/` — a **dataset catalog**: `datasets.json` beside three tiny
+  synthetic datasets, each a Zarr store folder (`.zarr/`), the form to publish
+  on GitHub;
+- `files/` — the 2-D dataset again as the two single files other hosts serve:
+  an `.h5ad` and a Zarr ZIP (`.zarr.zip`);
+- `.nojekyll` — an empty file that makes GitHub Pages publish the Zarr stores
+  whole (see [Step 6](#step-6-optional-turn-on-github-pages));
 - `.gitignore` and `.gitattributes` — the git metadata that keeps a checkout on
-  any platform byte-identical to the tree `--check` compares against. Thirteen
-  of the files under `exports/` are JSON, so a Windows checkout with
-  `core.autocrlf=true` would rewrite their line endings and fail that
-  comparison; `.gitattributes` pins them to LF everywhere; and
+  any platform byte-identical to the tree `--check` compares against: the
+  files inside a Zarr folder have no extension, so `.gitattributes` keeps them
+  byte-exact (no line-ending conversion), and pins `datasets.json` to LF; and
 - `LICENSE`, `CONTRIBUTING.md`, `SUPPORT.md`, `SECURITY.md` and
   `CODE_OF_CONDUCT.md` — how *this* repository is licensed, changed, asked
   about, and reported to. They govern this example; they are not part of the
@@ -20,195 +28,201 @@ top-level contents are exactly:
 Nothing else belongs in this repository: there are no tests, validation
 harness, package scaffolding, extra scripts, workflows, `.github/` directory,
 requirements file, or site assets. `generate_datasets.py` is the sole
-maintenance script and regenerates the complete checked-in `exports/` tree.
+maintenance script and regenerates the complete checked-in `catalog/` and
+`files/` trees.
 There is deliberately no `CITATION.cff`: these are synthetic teaching datasets,
 not a result to cite. To cite Cellucid itself, see
 [Citing Cellucid](https://docs.cellucid.com/en/latest/citing.html).
 
 ## Try this repository
 
-Open [Cellucid](https://www.cellucid.com), choose the **GitHub** data source,
-and enter:
+Open [Cellucid](https://www.cellucid.com), expand **Session**, paste this into
+**Open from link**, and press **Connect**:
 
 ```text
-theislab/cellucid-demo-custom-datasets/exports
+theislab/cellucid-demo-custom-datasets/catalog
 ```
 
-Then choose one of these small synthetic examples:
+The catalog opens on its default dataset, and **Sample dataset** lists all
+three small synthetic examples:
 
-- `synthetic-cell-types-2d` — two 2-D embeddings of the same cells, an island
-  layout and a marker-score layout, so the embedding picker has a choice;
-- `synthetic-development-3d` — a 3-D embedding with a velocity-style vector
-  field bound to it;
-- `synthetic-trajectory-1d` — a 1-D embedding with a vector field bound to it.
+| Dataset id | Contents | Open |
+| --- | --- | --- |
+| `synthetic-cell-types-2d` | 72 cells, 8 genes; two 2-D embeddings of the same cells (`X_islands`, the default, and `X_marker_scores`), so the embedding picker has a choice | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?data=gh:theislab/cellucid-demo-custom-datasets/catalog&dataset=synthetic-cell-types-2d) |
+| `synthetic-development-3d` | 96 cells, 10 genes; a 3-D embedding `X_branches` with a velocity field `velocity_branches` drawn over it | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?data=gh:theislab/cellucid-demo-custom-datasets/catalog&dataset=synthetic-development-3d) |
+| `synthetic-trajectory-1d` | 48 cells, 6 genes; a 1-D embedding `X_trajectory` with a velocity field `velocity_trajectory` | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?data=gh:theislab/cellucid-demo-custom-datasets/catalog&dataset=synthetic-trajectory-1d) |
 
-Every gene in all three carries two names: its `SYN_…` symbol, which is the
-default, and a synthetic accession such as `SYNC000001`, which the Gene names
-control switches to.
+Every dataset also has a weighted neighbour graph (`obsp['connectivities']`).
+Its genes are indexed by a synthetic accession (`SYNC000001`, as a real
+dataset is indexed by Ensembl ids) and named by their `SYN_…` symbols, which
+the viewer shows and searches by default; **Session › Data mapping › Gene
+names** switches to the accessions.
 
-You can also open them directly:
+The velocity fields follow scVelo's naming: `obsm['velocity_<basis>']` is drawn
+over `obsm['X_<basis>']`, for any basis — here `X_branches` and `X_trajectory`,
+not a UMAP.
 
-| Dataset | Open |
+### One dataset, without the catalog
+
+Each Zarr folder in `catalog/` opens on its own, and `files/` holds the 2-D
+dataset as one file in each single-file form. Every form is read in place with
+range requests, so only what a view needs is downloaded:
+
+| Form | `?data=` value | Open |
+| --- | --- | --- |
+| Zarr folder (for GitHub) | `gh:theislab/cellucid-demo-custom-datasets/catalog/synthetic-cell-types-2d.zarr` | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?data=gh:theislab/cellucid-demo-custom-datasets/catalog/synthetic-cell-types-2d.zarr) |
+| `.h5ad` (for single-file hosts) | `gh:theislab/cellucid-demo-custom-datasets/files/synthetic-cell-types-2d.h5ad` | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?data=gh:theislab/cellucid-demo-custom-datasets/files/synthetic-cell-types-2d.h5ad) |
+| Zarr ZIP (one file) | `gh:theislab/cellucid-demo-custom-datasets/files/synthetic-cell-types-2d.zarr.zip` | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?data=gh:theislab/cellucid-demo-custom-datasets/files/synthetic-cell-types-2d.zarr.zip) |
+
+The same files from GitHub Pages, which this repository has turned on:
+
+| What | `?data=` value |
 | --- | --- |
-| 2-D cell types | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?github=theislab/cellucid-demo-custom-datasets/exports&dataset=synthetic-cell-types-2d) |
-| 3-D development | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?github=theislab/cellucid-demo-custom-datasets/exports&dataset=synthetic-development-3d) |
-| 1-D trajectory | [![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?github=theislab/cellucid-demo-custom-datasets/exports&dataset=synthetic-trajectory-1d) |
+| The catalog | [`https://theislab.github.io/cellucid-demo-custom-datasets/catalog/`](https://www.cellucid.com/?data=https%3A%2F%2Ftheislab.github.io%2Fcellucid-demo-custom-datasets%2Fcatalog%2F&dataset=synthetic-development-3d) |
+| One Zarr folder | [`https://theislab.github.io/cellucid-demo-custom-datasets/catalog/synthetic-trajectory-1d.zarr/`](https://www.cellucid.com/?data=https%3A%2F%2Ftheislab.github.io%2Fcellucid-demo-custom-datasets%2Fcatalog%2Fsynthetic-trajectory-1d.zarr%2F) |
+
+A `gh:` value without `@branch` reads the repository's default branch (GitHub
+resolves `HEAD`, so `main`, `master` or any other works), and a link opens what
+is on that branch now. A file's `raw.githubusercontent.com` address, or its
+page on github.com, works as well as the `gh:` form.
 
 These are teaching datasets, not biological results. They contain no patient,
 donor, or clinical information.
 
 ## Cellucid documentation
 
-The Cellucid documentation uses this repository as its public reference
-catalog:
+The Cellucid documentation uses this repository as its public reference:
 
 - [Publish a Custom Dataset Repository](https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/11_custom_dataset_repository.html)
-  is the complete repository contract and publishing workflow.
-- [Host Exports for Sharing from R](https://docs.cellucid.com/en/latest/user_guide/r_package/d_viewing_loading/02_host_exports_for_sharing.html)
-  uses this catalog as the known-good GitHub example.
+  is the complete catalog contract and publishing workflow.
+- [Host a Dataset on GitHub](https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/15_host_on_github.html)
+  explains why a Zarr folder is the way to publish on GitHub, with measured
+  numbers, the size limits, `.nojekyll`, and Git LFS as the alternative.
+- [Host a Store for Sharing](https://docs.cellucid.com/en/latest/user_guide/r_package/d_viewing_loading/02_host_stores_for_sharing.html)
+  is the same path from R.
+- [Cellucid-ready AnnData specification](https://docs.cellucid.com/en/latest/user_guide/python_package/c_data_preparation_api/09_cellucid_ready_anndata_specification.html)
+  is the exact contract the files here satisfy.
 - [Troubleshoot Data Loading](https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/08_troubleshooting_data_loading.html)
-  uses it as the known-good connection when diagnosing GitHub paths.
-- The [Cellucid documentation index](https://docs.cellucid.com/en/latest/)
-  links this repository as the minimal public-catalog model.
+  uses this repository as the known-good connection when diagnosing GitHub
+  paths.
 
 ## What your repository needs
 
-The finished repository needs only this shape:
+One dataset needs only its Zarr folder. Several datasets, with a list the
+viewer shows and one it opens on, need a catalog folder:
 
 ```text
 your-repository/
 ├── README.md
-└── exports/
+├── .nojekyll                 # only if you turn on GitHub Pages
+└── catalog/
     ├── datasets.json
-    └── my-dataset/
-        ├── dataset_identity.json
-        ├── embeddings/
-        ├── obs_manifest.json
-        ├── obs/
-        ├── var_manifest.json
-        └── var/
+    ├── my-dataset.zarr/
+    └── second-dataset.zarr/
 ```
 
-Do not create those data files by hand. The Cellucid Python package writes
-them from your AnnData object.
+Do not write the Zarr folders by hand: `cellucid.prepare()` writes them from
+your data.
 
-## Step 1: prepare your dataset in Python
+## Step 1: write a Cellucid-ready AnnData
+
+Any AnnData opens in Cellucid as it is. Writing it with `prepare()` makes it
+read much faster over the internet (the expression matrix gene-major, arrays
+chunked for range requests) and lets it carry its own name, description,
+citation and launch defaults in `uns['cellucid']`.
 
 Install Cellucid in the Python environment used by your notebook:
 
 ```bash
-python -m pip install "cellucid==0.9.4"  # CELLUCID_VERSION
+python -m pip install "cellucid==0.9.5"  # CELLUCID_VERSION
 ```
 
-Cellucid is installed from PyPI. The version is pinned so this tutorial stays
-reproducible: `0.9.4` is the release these example exports were built with, and <!-- CELLUCID_VERSION -->
-it writes export format 3, which carries any number of embeddings per
-dimension and alternative gene-name sets. A viewer reads exactly one format, so
-an export written by an earlier release has to be prepared again.
+The version is pinned so this tutorial stays reproducible:
+`0.9.5` is the version these example files were built with. <!-- CELLUCID_VERSION -->
 
-The example below starts from an H5AD file produced by a typical Scanpy
+The example below starts from an `.h5ad` produced by a typical Scanpy
 workflow. It assumes the file contains:
 
-- `X_pca` in `adata.obsm`;
-- a 2-D UMAP in `adata.obsm["X_umap"]`;
-- a neighbor graph in `adata.obsp["connectivities"]`; and
-- gene symbols in `adata.var["gene_symbols"]` and accessions in
-  `adata.var["gene_ids"]`.
+- a 2-D UMAP in `adata.obsm["X_umap"]` and `X_pca` in `adata.obsm`;
+- a neighbour graph in `adata.obsp["connectivities"]`; and
+- gene ids in `adata.var_names` and symbols in `adata.var["gene_symbols"]`.
 
 In a Jupyter notebook, run:
 
 ```python
-from pathlib import Path
-
 import anndata as ad
-
-from cellucid import Embedding, prepare
-from cellucid.prepare_data import generate_datasets_manifest
+import cellucid
 
 adata = ad.read_h5ad("my_data.h5ad")
 
-dataset_id = "my-dataset"
-exports_dir = Path("exports")
-
-prepare(
-    latent_space=adata.obsm["X_pca"],
+cellucid.prepare(
+    "catalog/my-dataset.zarr",
+    format="zarr",
+    embeddings={"X_umap": adata.obsm["X_umap"], "X_pca": adata.obsm["X_pca"]},
+    dataset_id="my-dataset",
+    dataset_name="My dataset",
+    dataset_description="A short description of this dataset.",
     obs=adata.obs,
     var=adata.var,
     gene_expression=adata.X,
     var_gene_id_column="gene_symbols",
-    var_gene_name_columns=["gene_ids"],
     connectivities=adata.obsp["connectivities"],
-    embeddings={
-        "X_umap": Embedding(adata.obsm["X_umap"], label="UMAP", source_key="X_umap"),
-        "X_pca": Embedding(
-            adata.obsm["X_pca"], columns=[0, 1], label="PCA", source_key="X_pca"
-        ),
-    },
-    embedding_defaults={"2d": "X_umap"},
-    out_dir=exports_dir / dataset_id,
-    dataset_id=dataset_id,
-    dataset_name="My dataset",
-    dataset_description="A short description of this dataset.",
-    obs_categorical_dtype="uint16",
-    compression=6,
-    var_quantization=8,
-    obs_continuous_quantization=8,
-)
-
-generate_datasets_manifest(
-    exports_dir,
-    default_dataset=dataset_id,
+    latent_key="X_pca",
 )
 ```
 
-This creates:
+This writes the folder `catalog/my-dataset.zarr/`: a standard AnnData Zarr
+store that `anndata.read_zarr()` reads too. The `dataset_id` is the stable name
+links, saved sessions and community annotations use. Use letters, digits,
+`.`, `_` and `-`, and do not change it after sharing the dataset.
 
-```text
-exports/
-├── datasets.json
-└── my-dataset/
-    └── ...Cellucid data files...
+### Which `format`
+
+`format` is required, because the right one depends on where the data goes:
+
+| `format` | Writes | Use it for |
+| --- | --- | --- |
+| `"zarr"` | a `.zarr` folder of small files | **GitHub** (no file over 100 MB, no Git LFS; many small files at once over HTTP/2) |
+| `"h5ad"` | one `.h5ad` file | everything else: single-file hosts (Zenodo, Figshare, Hugging Face, a bucket, a lab server), local files, `cellucid serve`, Jupyter |
+| `"zarr.zip"` | the Zarr store as one `.zarr.zip` file | wherever an `.h5ad` goes; the single file cellucid-r writes |
+
+From R, `cellucid_prepare("catalog/my-dataset.zarr", format = "zarr", ...)`
+writes the same Zarr store (R writes `"zarr"` and `"zarr.zip"`).
+
+### Embeddings and vector fields
+
+`embeddings=` maps each `obsm` key to its array; every column is stored, and
+the viewer plots any 1 to 3 columns of any of them.
+`embedding_defaults={"2d": "X_umap"}` names the embedding a dimension opens on,
+and `{"3d": ("X_pca", [0, 1, 2])}` also picks its columns. `latent_key` names the latent space
+(scVI, PCA; never the 2D/3D layout) in which the viewer's outlier filter
+measures each cell's distance to its category's centre; `prepare()` computes
+those distances for every categorical obs column and stores them in the store
+(`uns['cellucid']['outlierQuantiles']`, a few MB per column), so the filter
+works at once instead of reading the whole latent space in the browser.
+
+A velocity is stored under scVelo's name, `obsm['velocity_<basis>']`, and
+drawn over `obsm['X_<basis>']`:
+
+```python
+cellucid.prepare(
+    ...,
+    embeddings={"X_umap": adata.obsm["X_umap"]},
+    vector_fields={"velocity": {"X_umap": adata.obsm["velocity_umap"]}},
+)
 ```
-
-The `dataset_id` is the stable name used in links. Use lowercase letters,
-numbers, and hyphens, and do not change it after sharing the dataset.
-
-### Embeddings
-
-`embeddings=` maps an id of your choosing to each embedding to export. Its
-dimension is the number of columns it is read from: a two-column array is 2-D,
-and a wider array such as the 50-column `X_pca` names the columns to plot with
-`Embedding(..., columns=[0, 1])`. `label` is what the viewer's embedding picker
-shows, and `source_key` records where the array came from. Export as many
-embeddings per dimension as you like; when a dimension has more than one,
-`embedding_defaults` names the one it opens on.
 
 ### Gene names your readers can search
 
-An export names every gene in one **default** name set — the string a reader
-sees in the field selector, reads off a legend, and types into the gene search
-box. `var_gene_id_column=` decides which `var` column that set comes from. It
-defaults to `var.index`. Point it at whichever column holds the symbols your
-readers already type (`"gene_symbols"` above): in an accession-indexed dataset
-left on the default, a reader searching `CD8A` finds nothing at all.
-
-`var_gene_name_columns=` adds alternative name sets, one per column, and the
-viewer's Gene names control switches between them — `"gene_ids"` above lets a
-reader search by accession as well. A name set is metadata only: every set
-reaches the same expression values, so a second one costs a few bytes in
-`var_manifest.json`.
+`var_gene_id_column=` names the `var` column whose values the viewer shows and
+searches. Point it at the symbols your readers type (`"gene_symbols"` above):
+in an accession-indexed dataset left on the index, a reader searching `CD8A`
+finds nothing. Every `var` column is stored, so a reader can switch to another
+column under **Session › Data mapping › Gene names**.
 
 Cellucid performs no symbol lookup and ships no mapping of any kind. If your
-source is indexed by accession and you want symbols, resolve them yourself —
-before calling `prepare()` — and pass the resulting column.
-
-In every set, an empty value takes the row's `var.index` name and a repeated
-name is made unique (`MATR3`, `MATR3-1`), and `prepare()` prints what it
-renamed. Names must be free of surrounding whitespace, because they are printed
-and typed. They are never filenames: every payload file in an export is named
-by an integer index (`var/0.values.u8.gz`), and the manifest beside it is what
-says which gene that index belongs to. A name therefore only has to be
-readable — no character in it has to please a filesystem.
+source is indexed by accession and you want symbols, resolve them yourself,
+before calling `prepare()`, and pass the resulting column.
 
 If your AnnData uses different keys, inspect them first:
 
@@ -216,145 +230,167 @@ If your AnnData uses different keys, inspect them first:
 print(list(adata.obsm.keys()))
 print(list(adata.obsp.keys()))
 print(list(adata.obs.columns))
-print(list(adata.var.columns))
 print(adata.var.head())
 ```
 
-Then replace the keys in the `prepare(...)` call with the exact keys in your
-file. Do not invent a missing embedding or graph.
-
-For a dataset without a connectivity graph, omit the `connectivities=...`
-line. For 1-D or 3-D data, add the real array to `embeddings=`; its column count
-is its dimension. The
+Then use the exact keys in your file. Do not invent a missing embedding or
+graph; for a dataset without a neighbour graph, omit `connectivities=`. The
 [complete preparation guide](https://docs.cellucid.com/en/latest/user_guide/python_package/c_data_preparation_api/index.html)
-explains velocity fields, multiple dimensions, metadata selection, and large
-datasets.
+explains every argument.
 
-## Step 2: check the folder locally
+## Step 2: write `datasets.json` (several datasets)
+
+A catalog folder lists its datasets in `datasets.json`, a few lines written by
+hand:
+
+```json
+{
+  "schema": 2,
+  "default": "my-dataset",
+  "datasets": [
+    { "id": "my-dataset", "path": "my-dataset.zarr/" },
+    { "id": "second-dataset", "path": "second-dataset.zarr/" }
+  ]
+}
+```
+
+`schema` is exactly `2`; `default` is the id the catalog opens on; each `id` is
+the dataset's `dataset_id`; each `path` is relative to the catalog folder — a
+Zarr folder ends in `/`, and an `.h5ad` or `.zarr.zip` file can be listed too.
+Names, descriptions and counts are not repeated here: Cellucid reads them from
+each store. [`catalog/datasets.json`](catalog/datasets.json) is this
+repository's.
+
+## Step 3: check it locally
 
 Before uploading anything:
 
 1. Open [Cellucid](https://www.cellucid.com).
-2. Choose the prepared-folder input.
-3. Select `exports/my-dataset`.
-4. Confirm the cell count, embedding, metadata, and gene values.
+2. Expand **Session**, and under **Files** choose **Zarr folder**.
+3. Select `catalog/my-dataset.zarr`.
+4. Confirm the cell and gene counts, the embeddings, the metadata, a gene, and
+   each vector field.
 
-This keeps GitHub setup separate from data-preparation problems.
+To check the whole catalog, serve the catalog folder with a static server that
+sends CORS headers and answers range requests, and open
+`https://www.cellucid.com/?data=http://127.0.0.1:8000/`. This keeps GitHub
+setup separate from data problems.
 
-## Step 3: create a public GitHub repository
+## Step 4: publish on GitHub
 
-The GitHub data source reads public files directly. A private repository will
+Cellucid reads public GitHub repositories directly; a private repository will
 not work with this public, token-free input.
 
-1. Sign in to [GitHub](https://github.com).
-2. Choose **New repository**.
-3. Give it a clear name, such as `my-lab-cellucid-datasets`.
-4. Select **Public**.
-5. Create the repository.
-6. Choose **Add file → Upload files**.
-7. Upload your `README.md` and the complete `exports/` folder without changing
-   its internal paths.
-8. Commit the upload to the `main` branch.
+1. Create a **public** repository on [GitHub](https://github.com), for example
+   `my-lab-cellucid-datasets`.
+2. Commit the catalog folder with Git from the command line (a Zarr folder is
+   many small files, and the github.com upload page takes at most 100 files at
+   a time):
 
-After the upload, verify that GitHub shows:
+   ```bash
+   git add catalog .nojekyll
+   git commit -m "Add datasets"
+   git push
+   ```
 
-```text
-README.md
-exports/datasets.json
-exports/my-dataset/dataset_identity.json
-```
+3. Check that the catalog is published: open
+   `https://raw.githubusercontent.com/OWNER/REPOSITORY/HEAD/catalog/datasets.json`
+   in a browser tab. It must show the JSON itself, not a 404 page.
 
-## Step 4: open the GitHub data in Cellucid
+## Step 5: open it in Cellucid
 
-In Cellucid:
+In **Session › Open from link**, enter `OWNER/REPOSITORY/catalog` and press
+**Connect**, then choose a dataset. For one Zarr folder, enter its path,
+`OWNER/REPOSITORY/catalog/my-dataset.zarr`.
 
-1. Choose the **GitHub** data source.
-2. Enter `OWNER/REPOSITORY/exports`.
-3. Connect.
-4. Choose `my-dataset`.
-
-For example:
+The shareable links have this form:
 
 ```text
-my-lab/my-lab-cellucid-datasets/exports
+https://www.cellucid.com/?data=gh:OWNER/REPOSITORY/catalog&dataset=my-dataset
+https://www.cellucid.com/?data=gh:OWNER/REPOSITORY/catalog/my-dataset.zarr
 ```
 
-The shareable link has this form:
-
-```text
-https://www.cellucid.com/?github=OWNER/REPOSITORY/exports&dataset=my-dataset
-```
-
-To give the link a one-click badge in your README, wrap it in the
+To give a link a one-click badge in your README, wrap it in the
 "Open in Cellucid" badge (the **Share** button beside **Dataset** in the
 Session panel writes this snippet for you):
 
 ```markdown
-[![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?github=OWNER/REPOSITORY/exports&dataset=my-dataset)
+[![Open in Cellucid](https://www.cellucid.com/assets/img/open-in-cellucid.svg)](https://www.cellucid.com/?data=gh:OWNER/REPOSITORY/catalog&dataset=my-dataset)
 ```
 
-The short repository form uses the `main` branch. If you intentionally publish
-from another branch, include it explicitly:
+The short form reads the repository's default branch, whatever it is called.
+To publish from another branch, tag or commit, put it after the repository
+name:
 
 ```text
-OWNER/REPOSITORY@BRANCH/exports
+OWNER/REPOSITORY@BRANCH/catalog
 ```
 
-## Step 5: turn on GitHub Pages
+## Step 6 (optional): turn on GitHub Pages
 
-The GitHub input above works without Pages. Pages is useful when you also want
-a stable static URL for the prepared files.
+The links above work without Pages. Pages answers a first request faster than
+`raw.githubusercontent.com` and gives the files a stable static address.
 
-1. Open the repository on GitHub.
-2. Choose **Settings**.
-3. In the left sidebar, choose **Pages**.
-4. Under **Build and deployment**, set **Source** to
-   **Deploy from a branch**.
-5. Choose the `main` branch and `/(root)`.
-6. Choose **Save**.
-7. Wait until GitHub reports that the site is live.
+GitHub Pages runs Jekyll by default, which publishes no file whose name starts
+with `.` and no folder whose name starts with `_` — so a Zarr store would be
+served without its metadata (`.zgroup`, `.zattrs`, `.zmetadata`) and its cell
+names (`obs/_index`). An empty `.nojekyll` file at the root of the published
+branch turns Jekyll off; this repository has one.
 
-Your catalog should then be available at:
+1. Open the repository's **Settings › Pages**.
+2. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
+3. Choose the default branch and `/ (root)`, and **Save**.
+4. When GitHub reports that the site is live, open
+   `https://OWNER.github.io/REPOSITORY/catalog/datasets.json` and
+   `https://OWNER.github.io/REPOSITORY/catalog/my-dataset.zarr/.zmetadata`.
+   Both must show JSON, not a 404 page.
+
+A Pages address is linked URL-encoded, ending in `/`:
 
 ```text
-https://OWNER.github.io/REPOSITORY/exports/datasets.json
+https://www.cellucid.com/?data=https%3A%2F%2FOWNER.github.io%2FREPOSITORY%2Fcatalog%2F&dataset=my-dataset
 ```
 
-Open that URL in a browser. You should see JSON, not a 404 page.
+## Or publish one file elsewhere
 
-The corresponding direct Cellucid URL is:
+For a host that serves single files, write one file instead of a folder:
 
-```text
-https://www.cellucid.com/?exportsBaseUrl=https%3A%2F%2FOWNER.github.io%2FREPOSITORY%2Fexports%2F&dataset=my-dataset
+```python
+cellucid.prepare("my-dataset.h5ad", format="h5ad", ...)        # Zenodo, Figshare, Hugging Face, a bucket
+cellucid.prepare("my-dataset.zarr.zip", format="zarr.zip", ...)  # the Zarr store as one file
 ```
 
-Replace `OWNER`, `REPOSITORY`, and `my-dataset` with your values.
+Upload the file and open its address the same way (on GitHub,
+`OWNER/REPOSITORY/path/to/my-dataset.h5ad`). GitHub refuses files over 100 MB
+unless they are stored with [Git LFS](https://git-lfs.com), whose transfers
+count against the account's LFS quota; Cellucid reads an LFS file from GitHub's
+media host, but on GitHub a Zarr folder needs no LFS at all.
 
 ## Regenerate these example datasets
 
 [`generate_datasets.py`](generate_datasets.py) contains the complete synthetic
 source data, exact dependency pins, generation logic, and safe replacement
-workflow. It is the only Python file in this repository. Its `_gene_frame()`
-helper is the worked version of the gene-name section above: every synthetic
-gene carries one `SYN_…` name in a `symbol` column and one synthetic accession
-in a `gene_id` column, `var.index` holds nothing but row labels,
-`var_gene_id_column="symbol"` selects the default names, and
-`var_gene_name_columns=["gene_id"]` adds the accessions as a second set. The
-2-D example passes two embeddings with `embedding_defaults={"2d": "islands"}`,
-and each vector field is bound to the embedding it is drawn over, as in
-`vector_fields={"velocity": {"branches": velocity}}`. With
-[uv](https://docs.astral.sh/uv/), its inline dependency
-metadata makes the checked-in exports reproducible without a requirements file.
+workflow. It is the only Python file in this repository. Every dataset is
+written by `cellucid.prepare()`: the three Zarr folders in `catalog/` with
+`format="zarr"`, and the 2-D dataset's single files in `files/` with
+`format="h5ad"` and `format="zarr.zip"`; it writes `catalog/datasets.json`
+itself. Its `_gene_frame()` helper is the worked version of the gene-name
+section above, and the 3-D and 1-D datasets pass
+`vector_fields={"velocity": {"X_branches": velocity}}` and
+`{"velocity": {"X_trajectory": velocity}}`. With
+[uv](https://docs.astral.sh/uv/), its inline dependency metadata makes the
+checked-in files reproducible without a requirements file. `prepare()` writes
+through `h5py` and `zarr`, so `anndata`, `h5py` and `zarr` are pinned as well.
 
 Rebuild into a temporary directory and compare every generated path and byte
-with `exports/`, without changing the repository:
+with `catalog/` and `files/`, without changing the repository:
 
 ```bash
 uv run generate_datasets.py --check
 ```
 
-To intentionally renew the complete export generation after editing the
-synthetic inputs, use:
+To intentionally renew the complete generation after editing the synthetic
+inputs, use:
 
 ```bash
 uv run generate_datasets.py --force
@@ -366,39 +402,40 @@ installed from their recorded sources, the equivalent commands are
 `python generate_datasets.py --force` and
 `python generate_datasets.py --check`.
 
-Before touching `exports/`, the script refuses to run unless the environment is
-the exact one the pins name: the Python version is in range, `cellucid`,
-`numpy`, `pandas` and `scipy` are installed at exactly the pinned versions, the
-`cellucid` metadata and runtime versions agree, and the imported `cellucid` is
-the pinned distribution rather than another copy shadowing it. If `cellucid` is
-an editable checkout instead of a released install, it additionally requires
-that checkout to have no uncommitted changes under `src/cellucid` or
-`pyproject.toml` — it does not pin a commit, so a clean checkout of a different
-commit is accepted, and re-running `--check` after changing `cellucid` is what
-catches that. It stages and verifies a complete generation before
-replacing the old directory, and restores the old directory when an ordinary
-Python error interrupts that swap. Portable directory replacement is not one
-filesystem-atomic operation: do not run a local viewer concurrently, and if
-the process or machine is forcibly terminated during the swap, restore the
-sole `.exports-backup-*` directory before retrying. There is intentionally no
-CI or separate test/validation framework in this artifact-only repository;
-inspect the renewed folders in Cellucid before publishing them.
+Before touching `catalog/` or `files/`, the script refuses to run unless the
+environment is the exact one the pins name: the Python version is in range,
+`cellucid`, `numpy`, `pandas`, `scipy`, `anndata`, `h5py` and `zarr` are
+installed at exactly the pinned versions, the `cellucid` metadata and runtime
+versions agree, and the imported `cellucid` is the pinned distribution rather
+than another copy shadowing it. If `cellucid` is an editable checkout instead
+of a released install, it additionally requires that checkout to have no
+uncommitted changes under `src/cellucid` or `pyproject.toml` — it does not pin
+a commit, so a clean checkout of a different commit is accepted, and re-running
+`--check` after changing `cellucid` is what catches that. `--check` also
+requires `.nojekyll` to be present and empty, and reads every written dataset
+back with `anndata` to confirm its id, counts and `obsm` keys. `--force` stages
+and verifies a complete generation before replacing the old directories, and
+restores them when an ordinary Python error interrupts that swap. Portable
+directory replacement is not one filesystem-atomic operation: do not run a
+local viewer concurrently, and if the process or machine is forcibly
+terminated during the swap, restore the `.catalog-backup-*` and
+`.files-backup-*` directories before retrying. There is intentionally no CI or
+separate test/validation framework in this artifact-only repository; inspect
+the renewed files in Cellucid before publishing them.
 
 ## Add more datasets
 
-Repeat the complete Step 1 cell for the second AnnData object. Give it a new
-`dataset_id`, a new `dataset_name`, and a new output such as
-`Path("exports") / "second-dataset"`. After every dataset folder exists, call
-`generate_datasets_manifest("exports", default_dataset="my-dataset")` once
-more. Upload the updated `exports/` folder to GitHub. Cellucid will read the
-new `datasets.json` and show both datasets.
+Run `prepare()` again for the second AnnData object, with a new `dataset_id`,
+a new `dataset_name`, and a new output such as `catalog/second-dataset.zarr`.
+Add its entry to `datasets.json`, commit both, and push. Cellucid reads the
+new `datasets.json` and lists both datasets.
 
 ## Update an existing dataset
 
 Keep the same `dataset_id` when the dataset is still the same shared object.
-To replace an existing local export intentionally, rerun the complete
-`prepare(...)` call with `force=True`, regenerate `datasets.json`, inspect the
-result locally, and upload the changed `exports/` folder.
+To replace a store you already wrote, rerun `prepare(...)` with `force=True`,
+inspect the result locally, and commit the changed folder; Git removes the
+chunk files that are gone when you `git add` the folder.
 
 Use a new `dataset_id` when cell order, gene identity, or biological meaning
 changes enough that old saved sessions should not be applied to the new data.
@@ -411,7 +448,7 @@ Before making the repository public:
 - remove patient names, clinical identifiers, private sample IDs, and internal
   notes;
 - confirm that gene and cell labels are safe to share;
-- load the prepared folder locally and inspect what appears in Cellucid; and
+- open the written store locally and inspect what appears in Cellucid; and
 - ask the person responsible for the data if public release is permitted.
 
 If the data cannot be public, do not upload it to this type of repository. Use
@@ -420,26 +457,35 @@ on an appropriately protected system instead.
 
 ## Common problems
 
-**Cellucid cannot find `datasets.json`**
+**Cellucid says the folder holds no `datasets.json`**
 
 Enter the folder that directly contains it. If the file is
-`exports/datasets.json`, use `OWNER/REPOSITORY/exports`.
+`catalog/datasets.json`, use `OWNER/REPOSITORY/catalog` — or link one Zarr
+folder directly.
 
-**The repository connects but no dataset appears**
+**`Invalid datasets.json: …`**
 
-Open `exports/datasets.json` on GitHub and confirm that each listed folder
-contains `dataset_identity.json`.
+The message names the key or value: an unknown key, a missing `schema`,
+`default` or `datasets` (a catalog must hold all three), a `schema` other than
+`2`, a path that is not a Zarr folder (ending in `/`), `.h5ad` or `.zarr.zip`,
+or a repeated id or path.
 
-**GitHub Pages returns 404**
+**A dataset is listed but does not open**
 
-Confirm Pages uses `main` and `/(root)`, wait for the deployment to finish, and
-open the exact `/exports/datasets.json` URL.
+The message names the dataset and the reason: a missing file (404), an id that
+differs from the store's `uns['cellucid']['id']`, or a folder that is not an
+AnnData store.
+
+**It opens from `raw.githubusercontent.com` but not from GitHub Pages**
+
+Add the empty `.nojekyll` file at the root of the published branch, so Pages
+publishes the store's dot-files and its `_index` folders.
 
 **A file is too large for GitHub**
 
-GitHub rejects ordinary Git files larger than 100 MiB. Use the
-[Cellucid server workflow](https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/04_server_tutorial.html)
-instead of Git LFS pointers.
+GitHub rejects ordinary Git files larger than 100 MiB. Write `format="zarr"`:
+each chunk file of a Zarr folder is small. For a single file, use Git LFS or
+another host.
 
 **The wrong dataset opens**
 

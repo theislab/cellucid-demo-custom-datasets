@@ -13,7 +13,7 @@ Thanks for using the Cellucid custom-dataset example.
   https://github.com/theislab/cellucid-demo-custom-datasets/issues
 - Anything about how the viewer connects, draws, filters, or exports what it
   loaded belongs in the web app: https://github.com/theislab/cellucid/issues
-- Anything about `prepare()` — the export it wrote, its arguments, or an error
+- Anything about `prepare()` — the file it wrote, its arguments, or an error
   it raised — belongs in the Python package:
   https://github.com/theislab/cellucid-python/issues, or in
   https://github.com/theislab/cellucid-r/issues for `cellucid_prepare()`.
@@ -22,18 +22,22 @@ Thanks for using the Cellucid custom-dataset example.
 ## Your own repository
 
 Most questions here are about a reader's own dataset repository rather than
-this one. Two checks settle nearly all of them, and both are worth running
+this one. Three checks settle nearly all of them, and each is worth running
 before opening an issue anywhere:
 
-- Load the prepared folder locally, with **Prepared** under **Local data:**. If
-  it is already wrong there, the problem is in the export, not in GitHub.
+- Open the file or Zarr folder locally, with **Zarr folder**, **H5AD** or
+  **Zarr ZIP** under **Files** in the Session panel. If it is already wrong
+  there, the problem is in the file, not in GitHub.
 - Open your raw catalog URL in a browser tab:
   `https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>/datasets.json`.
   It must return the JSON itself — not an HTML sign-in page, a Git LFS pointer,
   or a 404. The most common mistake is giving Cellucid the repository instead of
-  the exports root inside it.
+  the catalog folder inside it.
+- Served from GitHub Pages, a Zarr store needs an empty `.nojekyll` file at the
+  root of the published branch; without it Pages drops the store's `.zgroup`,
+  `.zattrs` and `.zmetadata` files and its `obs/_index` folder.
 
-Quote the exact value you typed into the **GitHub data:** field and the exact
+Quote the exact value you typed into the **Open from link** field and the exact
 message Cellucid showed; the notification names both the plain cause and the
 URL it actually requested.
 
@@ -42,9 +46,9 @@ URL it actually requested.
 The datasets in this repository are synthetic teaching material and contain no
 patient, donor, or clinical information. Please don’t attach private data
 (including patient-derived data) to issues or logs here. Prefer minimal
-synthetic examples, anonymized screenshots, or small reproducible exports.
+synthetic examples, anonymized screenshots, or small reproducible files.
 
-Publishing a prepared dataset publishes the coordinates, metadata, gene values,
+Publishing a dataset publishes the coordinates, metadata, gene values,
 graphs, vector fields, and provenance you included in it. `README.md` has the
 privacy checklist to work through before a repository goes public.
 

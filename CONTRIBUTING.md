@@ -4,7 +4,7 @@ Contributions are welcome — corrections to the publishing guide, fixes to the
 generator, and issues about an example dataset that will not open.
 
 This file focuses on `cellucid-demo-custom-datasets`, the worked example of
-publishing your own prepared datasets on GitHub. It describes contributing **to
+publishing your own datasets on GitHub. It describes contributing **to
 this example**. If you are publishing your own data, you do not contribute
 here: you build your own repository, and `README.md` is your guide.
 
@@ -24,15 +24,15 @@ Cellucid is split by responsibility:
 |---|---|---|
 | `cellucid` | Web app (UI + state + WebGL rendering) | are fixing how the viewer connects to GitHub, or how it draws what it loaded |
 | `cellucid-python` | Python package + CLI + Sphinx docs | are fixing `prepare`/`serve`, or any documentation page for any repository |
-| `cellucid-r` | R package exporter | are changing `cellucid_prepare()` |
+| `cellucid-r` | R package writing the same Cellucid-ready AnnData from R | are changing `cellucid_prepare()` |
 | `cellucid-demo-custom-datasets` (this repo) | Worked example of publishing your own datasets | are changing this guide or its synthetic examples |
 | `cellucid-datasets` | The published demo catalog | are correcting a published generation or its catalog entry |
 | `cellucid-annotation` | Reference layout for annotation repositories | are changing the annotation schema, validation, or workflows |
 
 A dataset that renders wrongly is usually a viewer issue, not an example issue.
-Load the same folder with the **Prepared** local input first: if it is wrong
-there too, it is the export; if it is only wrong over GitHub, it is the
-connection.
+Open the same store locally first (**Zarr folder**, **H5AD** or **Zarr ZIP**
+under **Files** in the Session panel): if it is wrong there too, it is the
+file; if it is only wrong over GitHub, it is the connection.
 
 The publishing workflow itself is documented once, in
 [Publish a Custom Dataset Repository](https://docs.cellucid.com/en/latest/user_guide/web_app/b_data_loading/11_custom_dataset_repository.html).
@@ -43,13 +43,16 @@ change in the other, in the same pass.
 
 ## What is authored here, and what is generated
 
-Nothing under `exports/` is written by hand. The whole tree is produced by
-`generate_datasets.py`, which holds the synthetic source data, the export
-parameters, and the catalog call in one file, and replaces `exports/` whole.
+Nothing under `catalog/` or `files/` is written by hand. Both trees are
+produced by `generate_datasets.py`, which holds the synthetic source data, the
+`cellucid.prepare()` calls and `datasets.json` in one file, and replaces both
+folders whole. `.nojekyll` is the one data-side file kept by hand; it is empty,
+and `--check` refuses to pass without it.
 
 So a fix to an example dataset is a fix to `generate_datasets.py` plus the
-regenerated tree — never an edit to a payload file or a manifest. A hand-edited
-export is invisible to review, and vanishes at the next generation.
+regenerated trees — never an edit to a Zarr chunk, a `.zattrs` or the catalog.
+A hand-edited file is invisible to review, and vanishes at the next
+generation.
 
 ---
 
@@ -62,11 +65,11 @@ run before you open a pull request. Nothing else will run it for you:
 python generate_datasets.py --check
 ```
 
-It rebuilds the complete catalog into a temporary directory and compares every
-generated path and byte against the checked-in `exports/`, without modifying the
-repository. It must print `PASS` and exit 0.
+It rebuilds every dataset into a temporary directory and compares every
+generated path and byte against the checked-in `catalog/` and `files/`, without
+modifying the repository. It must print `PASS` and exit 0.
 
-If you changed the synthetic inputs or the export parameters on purpose,
+If you changed the synthetic inputs or the `prepare()` arguments on purpose,
 regenerate with `--force` and then re-run `--check`. README.md's *Regenerate
 these example datasets* section is the single description of what those two
 commands guarantee, which pins they enforce, and how to recover from an
@@ -78,7 +81,7 @@ Two consequences are yours as a contributor rather than the reader's:
   version bump, not a fix. Update the inline pins, `CELLUCID_RELEASE`, and the
   install command in `README.md` in the same change.
 - The pins are what make the bytes reproducible, so a PR that regenerates
-  `exports/` without saying which environment produced it cannot be reviewed.
+  `catalog/` or `files/` without saying which environment produced it cannot be reviewed.
   Say so, and paste the `--check` output.
 
 ---
@@ -88,7 +91,7 @@ Two consequences are yours as a contributor rather than the reader's:
 - Keep PRs small and focused (one dataset, or one section of the guide).
 - Include what changed, why, and the `--check` output.
 - Regenerate rather than patch: attach the `generate_datasets.py` diff alongside
-  the changed `exports/` tree.
+  the changed `catalog/` and `files/` trees.
 - Keep the root minimal. `README.md` enumerates this repository's committed
   top-level contents exactly, and the documentation page above describes that
   root to readers who copy it, so a new root file means updating both in the
