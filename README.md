@@ -37,7 +37,7 @@ not a result to cite. To cite Cellucid itself, see
 ## Try this repository
 
 Open [Cellucid](https://www.cellucid.com), expand **Session**, paste this into
-**Open from link**, and press **Connect**:
+the **Link or server** address bar, and press **Open**:
 
 ```text
 theislab/cellucid-demo-custom-datasets/catalog
@@ -266,7 +266,9 @@ repository's.
 Before uploading anything:
 
 1. Open [Cellucid](https://www.cellucid.com).
-2. Expand **Session**, and under **Files** choose **Zarr folder**.
+2. Expand **Session**, click **Open…** under **File or folder**, and choose
+   **Zarr folder…** (in Safari, drag the folder onto the page instead: its
+   folder dialog leaves out the store's hidden metadata files).
 3. Select `catalog/my-dataset.zarr`.
 4. Confirm the cell and gene counts, the embeddings, the metadata, a gene, and
    each vector field.
@@ -299,8 +301,8 @@ not work with this public, token-free input.
 
 ## Step 5: open it in Cellucid
 
-In **Session › Open from link**, enter `OWNER/REPOSITORY/catalog` and press
-**Connect**, then choose a dataset. For one Zarr folder, enter its path,
+In **Session › Link or server**, enter `OWNER/REPOSITORY/catalog` and press
+**Open**, then choose a dataset in the dataset list. For one Zarr folder, enter its path,
 `OWNER/REPOSITORY/catalog/my-dataset.zarr`.
 
 The shareable links have this form:

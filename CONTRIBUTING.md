@@ -30,8 +30,8 @@ Cellucid is split by responsibility:
 | `cellucid-annotation` | Reference layout for annotation repositories | are changing the annotation schema, validation, or workflows |
 
 A dataset that renders wrongly is usually a viewer issue, not an example issue.
-Open the same store locally first (**Zarr folder**, **H5AD** or **Zarr ZIP**
-under **Files** in the Session panel): if it is wrong there too, it is the
+Open the same store locally first (**Open…** under **File or folder** in the
+Session panel, or drag the folder onto the page): if it is wrong there too, it is the
 file; if it is only wrong over GitHub, it is the connection.
 
 The publishing workflow itself is documented once, in

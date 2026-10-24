@@ -25,8 +25,8 @@ Most questions here are about a reader's own dataset repository rather than
 this one. Three checks settle nearly all of them, and each is worth running
 before opening an issue anywhere:
 
-- Open the file or Zarr folder locally, with **Zarr folder**, **H5AD** or
-  **Zarr ZIP** under **Files** in the Session panel. If it is already wrong
+- Open the file or Zarr folder locally, with **Open…** (**File…** or
+  **Zarr folder…**) under **File or folder** in the Session panel. If it is already wrong
   there, the problem is in the file, not in GitHub.
 - Open your raw catalog URL in a browser tab:
   `https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>/datasets.json`.
@@ -37,7 +37,7 @@ before opening an issue anywhere:
   root of the published branch; without it Pages drops the store's `.zgroup`,
   `.zattrs` and `.zmetadata` files and its `obs/_index` folder.
 
-Quote the exact value you typed into the **Open from link** field and the exact
+Quote the exact value you typed into the **Link or server** address bar and the exact
 message Cellucid showed; the notification names both the plain cause and the
 URL it actually requested.
 
